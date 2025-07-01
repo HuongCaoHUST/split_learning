@@ -63,9 +63,6 @@ class Server:
         password = config["rabbit"]["password"]
         delete_old_queues(address, username, password)
 
-        # Model
-        self.model_name = config["server"]["model"]
-
         # Clients
         self.total_clients = config["server"]["clients"]
         self.batch_size = config["learning"]["batch-size"]
@@ -74,8 +71,12 @@ class Server:
         self.control_count = config["learning"]["control-count"]
         self.register_clients = [0 for _ in range(len(self.total_clients))]
         self.list_clients = []
+
+        # Model
+        self.model_path = config["model"]["model_path"]
+
         #Dataset
-        self.data_path = config["dataset"]["dataset_path"]
+        self.dataset_path = config["dataset"]["dataset_path"]
 
         log_path = config["log_path"]
 
@@ -123,7 +124,8 @@ class Server:
                 response = {"action": "START",
                             "message": "Server accept the connection!",
                             "num_layers": len(self.total_clients),
-                            "model_name": self.model_name,
+                            "model_path": self.model_path,
+                            "dataset_path": self.dataset_path,
                             "control_count": self.control_count,
                             "batch_size": self.batch_size,
                             "lr": self.lr,
