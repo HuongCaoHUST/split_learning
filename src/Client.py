@@ -26,9 +26,30 @@ class Client:
     
     def connect(self):
         credentials = pika.PlainCredentials(self.username, self.password)
-        parameters = pika.ConnectionParameters(host=self.address, credentials=credentials)
-        self.connection = pika.BlockingConnection(parameters)
+        self.connection = pika.BlockingConnection(pika.ConnectionParameters(self.address, 5672, '/', credentials))
         self.channel = self.connection.channel()
-        
-        self.channel.queue_declare(queue=f"client_{self.client_id}_layer_{self.layer_id}", durable=True)
-        print(f"Client {self.client_id} connected to server at {self.address}")
+
+    def send_to_server(self, message):
+        self.connect()
+        self.response = None
+
+        self.channel.queue_declare('Server_queue', durable=False)
+        self.channel.basic_publish(exchange='',
+                                   routing_key='Server_queue',
+                                   body=pickle.dumps(message))
+
+        return self.response
+    
+    def wait_response(self):
+        status = True
+        reply_queue_name = f'reply_{self.client_id}'
+        self.channel.queue_declare(reply_queue_name, durable=False)
+        while status:
+            method_frame, header_frame, body = self.channel.basic_get(queue=reply_queue_name, auto_ack=True)
+            if body:
+                status = self.response_message(body)
+            time.sleep(0.5)
+
+    def response_message(self, body):
+        self.response = pickle.loads(body)
+        src.Log.print_with_color(f"[<<<] Client received: {self.response}", "blue")

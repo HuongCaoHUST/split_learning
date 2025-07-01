@@ -14,9 +14,9 @@ rabbit:
   address: 127.0.0.1
   username: user
   password: password
-
-model_path: ./yolo11n.pt
-dataset_path: ./datasets/livingroom.yaml
+dataset:
+  model_path: ./yolo11n.pt
+  dataset_path: ./datasets/livingroom.yaml
 
 log_path: .
 

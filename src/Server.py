@@ -63,12 +63,19 @@ class Server:
         password = config["rabbit"]["password"]
         delete_old_queues(address, username, password)
 
+        # Model
+        self.model_name = config["server"]["model"]
+
         # Clients
         self.total_clients = config["server"]["clients"]
         self.batch_size = config["learning"]["batch-size"]
         self.lr = config["learning"]["learning-rate"]
         self.momentum = config["learning"]["momentum"]
         self.control_count = config["learning"]["control-count"]
+        self.register_clients = [0 for _ in range(len(self.total_clients))]
+        self.list_clients = []
+        #Dataset
+        self.data_path = config["dataset"]["dataset_path"]
 
         log_path = config["log_path"]
 
@@ -93,4 +100,51 @@ class Server:
         action = message["action"]
         client_id = message["client_id"]
         layer_id = message["layer_id"]
-        print(f"Received request from client {client_id} for action '{action}' on layer {layer_id}")
+
+        if (str(client_id), layer_id) not in self.list_clients:
+            self.list_clients.append((str(client_id), layer_id))
+
+        if action == "REGISTER":
+            src.Log.print_with_color(f"[<<<] Received message from client: {message}", "blue")
+            self.register_clients[layer_id - 1] += 1
+
+            if self.register_clients == self.total_clients:
+                src.Log.print_with_color("All clients are connected. Sending notifications.", "green")
+                self.notify_to_clients()
+
+        # Ack the message
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+
+    def notify_to_clients(self, start=True, register=True):
+
+        src.Log.print_with_color(f"notify_client", "red")
+        for (client_id, layer_id) in self.list_clients:
+            if start:
+                response = {"action": "START",
+                            "message": "Server accept the connection!",
+                            "num_layers": len(self.total_clients),
+                            "model_name": self.model_name,
+                            "control_count": self.control_count,
+                            "batch_size": self.batch_size,
+                            "lr": self.lr,
+                            "momentum": self.momentum}
+            else:
+                src.Log.print_with_color(f"[>>>] Sent stop training request to client {client_id}", "red")
+                response = {"action": "STOP",
+                            "message": "Stop training!",
+                            "parameters": None}
+            self.time_start = time.time_ns()
+            src.Log.print_with_color(f"[>>>] Sent start training request to client {client_id}", "red")
+            self.send_to_client(client_id, pickle.dumps(response))
+
+    def send_to_client(self, client_id, message):
+        reply_channel = self.connection.channel()
+        reply_queue_name = f'reply_{client_id}'
+        reply_channel.queue_declare(reply_queue_name, durable=False)
+
+        src.Log.print_with_color(f"[>>>] Sent notification to client {client_id}", "red")
+        reply_channel.basic_publish(
+            exchange='',
+            routing_key=reply_queue_name,
+            body=message
+        )
