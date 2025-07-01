@@ -14,13 +14,14 @@ import src.Model
 
 
 class Client:
-    def __init__(self, client_id, layer_id, address, username, password, device):
+    def __init__(self, client_id, layer_id, address, username, password, train_func, device):
         self.client_id = client_id
         self.layer_id = layer_id
         self.address = address
         self.username = username
         self.password = password
         self.device = device
+        self.train_func = train_func
         print(f"Client {self.client_id} initialized with layer {self.layer_id} on device {self.device}")
         self.connect()
     
@@ -52,4 +53,10 @@ class Client:
 
     def response_message(self, body):
         self.response = pickle.loads(body)
+        action = self.response["action"]
+        model_path = self.response.get("model_path")
+        dataset_path = self.response.get("dataset_path")
         src.Log.print_with_color(f"[<<<] Client received: {self.response}", "blue")
+        if action == "START":
+            if self.layer_id == 1:
+                result, size = self.train_func(model_path, dataset_path)

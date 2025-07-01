@@ -7,7 +7,7 @@ import torch
 
 import src.Log
 from src.Client import Client
-from src.Scheduler import Scheduler
+from src.Trainning import Trainning
 
 
 parser = argparse.ArgumentParser(description="Split learning framework")
@@ -47,6 +47,7 @@ channel = connection.channel()
 if __name__ == "__main__":
     src.Log.print_with_color("[>>>] Client sending registration message to server...", "red")
     data = {"action": "REGISTER", "client_id": client_id, "layer_id": args.layer_id, "message": "Hello from Client!"}
-    client = Client(client_id, args.layer_id, address, username, password, device)
+    trainning = Trainning(client_id, args.layer_id, channel, device, args.event_time)
+    client = Client(client_id, args.layer_id, address, username, password, trainning.train_on_device, device)
     client.send_to_server(data)
     client.wait_response()
