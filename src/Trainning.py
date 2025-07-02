@@ -35,7 +35,30 @@ class Trainning:
 
         # Finish epoch training, send notify to server
         src.Log.print_with_color("[>>>] Finish training!", "red")
-
+    def train_on_last_layer(self, model_path, dataset_path):
+        queue_name = f'label_queue'
+        self.channel.queue_declare(queue=queue_name, durable=False)
+        self.channel.basic_qos(prefetch_count=10)
+        print('Waiting for intermediate output. To exit press CTRL+C')
+        while True:
+            # Process gradient
+            method_frame, header_frame, body = self.channel.basic_get(queue=queue_name, auto_ack=True)
+            if method_frame and body:
+                received_data = pickle.loads(body)
+                data_id = received_data["data_id"]
+                data = received_data["label"]
+                print(f"Received data_id: {data_id}")
+                # print(f"Received data: {data}")
+            # Check training process
+            if method_frame is None:
+                broadcast_queue_name = f'reply_{self.client_id}'
+                method_frame, header_frame, body = self.channel.basic_get(queue=broadcast_queue_name, auto_ack=True)
+                if body:
+                    received_data = pickle.loads(body)
+                    src.Log.print_with_color(f"[<<<] Received message from server {received_data}", "blue")
+                    if received_data["action"] == "PAUSE":
+                        return True
+                    
     def train_on_device(self, model_path, dataset_path):
         self.data_count = 0
         if self.layer_id == 1:
@@ -58,7 +81,7 @@ class Trainning:
             self.channel.queue_declare(queue=forward_queue_name, durable=False)
             self.channel.basic_qos(prefetch_count=10)
             
-            result = 1
+            result = self.train_on_last_layer(model_path, dataset_path)
 
         if self.event_time:
             src.Log.print_with_color(f"Training time events {self.time_event}", "yellow")
