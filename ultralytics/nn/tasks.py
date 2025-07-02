@@ -9,7 +9,9 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
-
+import uuid
+import pika
+import pickle
 from ultralytics.nn.autobackend import check_class_names
 from ultralytics.nn.modules import (
     AIFI,
@@ -173,7 +175,19 @@ class BaseModel(torch.nn.Module):
         embed = frozenset(embed) if embed is not None else {-1}
         max_idx = max(embed)
         data_store = {}
+        start_layer = 3
+        if self.is_training and self.layer_id == 2:
+            queue_name = f'intermediate_queue_{self.layer_id - 1}'
+            self.channel = self.connect_rabbitmq()
+            method_frame, header_frame, body = self.channel.basic_get(queue=queue_name, auto_ack=True)
+            if method_frame and body:
+                received_data = pickle.loads(body)
+                print(f"Received data_id: {received_data['data_id']}")
+
         for m in self.model:
+            if m.i < start_layer and self.layer_id == 2:
+                print("Skipping layer:", m.i)
+                
             if m.f != -1:  # if not from previous layer
                 x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
             if profile:
@@ -183,19 +197,68 @@ class BaseModel(torch.nn.Module):
             if visualize:
                 feature_visualization(x, m.type, m.i, save_dir=visualize)
 
-            if self.is_training and m.i in {4, 6, 10}:
+            # Forward in client 1
+            if self.is_training and m.i in {2} and self.layer_id == 1:
                 data_store[m.i] = x.detach().clone()
-                print("FLAG:", self.is_training)
-                print("Tensor", m.i, "shape:", data_store[m.i].shape)
+                print(f"Shape of detached tensor at layer {m.i}: {x.detach().shape}")
+
             if m.i in embed:
                 embeddings.append(torch.nn.functional.adaptive_avg_pool2d(x, (1, 1)).squeeze(-1).squeeze(-1))  # flatten
                 if m.i == max_idx:
                     return torch.unbind(torch.cat(embeddings, 1), dim=0)
-        print("___PREDICT_ONE___")
+        
         if self.is_training and self.layer_id == 1:
             self.data_store = data_store
-            print("DATA STORE:", self.data_store)
+            data_id = uuid.uuid4()
+            self.channel = self.connect_rabbitmq()
+            success = self.send_to_intermediate_queue(data_id, data_store)
+            if not success:
+                print(f"Không thể gửi data_store tới intermediate_queue.")
         return x
+    
+    def connect_rabbitmq(self):
+        """
+        Thiết lập kết nối tới RabbitMQ và trả về kênh (channel) để sử dụng.
+        """
+        self.address = "127.0.0.1"
+        self.username = "user"
+        self.password = "password"
+
+        try:
+            credentials = pika.PlainCredentials(self.username, self.password)
+            parameters = pika.ConnectionParameters(
+                host=self.address,
+                port=5672,
+                virtual_host='/',
+                credentials=credentials
+            )
+            
+            connection = pika.BlockingConnection(parameters)
+            
+            channel = connection.channel()
+            print("Kết nối tới RabbitMQ thành công!")
+            return channel
+        except Exception as e:
+            print(f"Lỗi kết nối tới RabbitMQ: {e}")
+            return None
+
+    def send_to_intermediate_queue(self, data_id, data_store):
+        queue_name = f'intermediate_queue_{self.layer_id}'
+        self.channel.queue_declare(queue_name, durable=False)
+
+        message = pickle.dumps(
+            {"data_id": data_id,
+            "data_store": data_store}
+        )
+
+        self.channel.basic_publish(
+            exchange='',
+            routing_key=queue_name,
+            body=message
+        )
+
+        print(f"Data_store {data_id} đã được gửi tới {queue_name}")
+        return True
 
     def _predict_augment(self, x):
         """Perform augmentations on input image x and return augmented inference."""
@@ -419,6 +482,7 @@ class DetectionModel(BaseModel):
         self.layer_id = layer_id
         self.is_training = False
         self.data_store=None
+        self.channel = channel
         print(f"Client ID in TASK: {self.client_id}, Layer ID: {self.layer_id}")
 
         # Build strides

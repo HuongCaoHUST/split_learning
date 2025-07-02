@@ -41,14 +41,23 @@ class Trainning:
         self.channel.basic_qos(prefetch_count=10)
         print('Waiting for intermediate output. To exit press CTRL+C')
         while True:
-            # Process gradient
-            method_frame, header_frame, body = self.channel.basic_get(queue=queue_name, auto_ack=True)
-            if method_frame and body:
-                received_data = pickle.loads(body)
-                data_id = received_data["data_id"]
-                data = received_data["label"]
-                print(f"Received data_id: {data_id}")
+            # method_frame, header_frame, body = self.channel.basic_get(queue=queue_name, auto_ack=True)
+            # if method_frame and body:
+                # received_data = pickle.loads(body)
+                # data_id = received_data["data_id"]
+                # data = received_data["label"]
+                # print(f"Received data_id: {data_id}")
                 # print(f"Received data: {data}")
+            src.Log.print_with_color("--- START TRAINING SECOND LAYER ---", "green")
+            args = dict(model=model_path,
+                        data=dataset_path,
+                        epochs=1,
+                        client_id=self.client_id,
+                        layer_id=self.layer_id,
+                        channel=self.channel)
+            trainer = DetectionTrainer(overrides=args)
+            trainer.train()
+
             # Check training process
             if method_frame is None:
                 broadcast_queue_name = f'reply_{self.client_id}'
@@ -72,7 +81,7 @@ class Trainning:
 
         elif self.layer_id == 2:
             # Create intermediate queue
-            forward_queue_name = f'intermediate_queue_{self.layer_id - 1}_to_{self.layer_id}'
+            forward_queue_name = f'intermediate_queue_{self.layer_id - 1}'
             self.channel.queue_declare(queue=forward_queue_name, durable=False)
             self.channel.basic_qos(prefetch_count=10)
 
