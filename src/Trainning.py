@@ -6,7 +6,8 @@ from tqdm import tqdm
 import torch
 import torch.optim as optim
 import torch.nn as nn
-from ultralytics.models.yolo import YOLO
+import threading
+from ultralytics.models.yolo.detect import DetectionTrainer
 import src.Log
 
 
@@ -22,18 +23,15 @@ class Trainning:
         self.time_event = []
 
     def train_on_first_layer(self, model_path, dataset_path):
-        
-        print(f"Model path is: {model_path}")
-        print(f"Dataset path is: {dataset_path}")
-
-        while True:
-            model = YOLO(model_path)
-            model.train(
-                data=dataset_path,
-                epochs=3,
-                imgsz=640,
-                batch=16
-            )
+        src.Log.print_with_color("--- START TRAINING FIRST LAYER ---", "green")
+        args = dict(model=model_path,
+                    data=dataset_path,
+                    epochs=1,
+                    client_id=self.client_id,
+                    layer_id=self.layer_id,
+                    channel=self.channel)
+        trainer = DetectionTrainer(overrides=args)
+        trainer.train()
 
         # Finish epoch training, send notify to server
         src.Log.print_with_color("[>>>] Finish training!", "red")
@@ -41,9 +39,26 @@ class Trainning:
     def train_on_device(self, model_path, dataset_path):
         self.data_count = 0
         if self.layer_id == 1:
+
+            # Create gradient queue
+            forward_queue_name = f'gradient_queue_{self.layer_id}'
+            self.channel.queue_declare(queue=forward_queue_name, durable=False)
+            self.channel.basic_qos(prefetch_count=10)
+
             result = self.train_on_first_layer(model_path, dataset_path)
-        # elif self.layer_id == num_layers:
-        #     result = self.train_on_last_layer()
+
+        elif self.layer_id == 2:
+            # Create intermediate queue
+            forward_queue_name = f'intermediate_queue_{self.layer_id - 1}_to_{self.layer_id}'
+            self.channel.queue_declare(queue=forward_queue_name, durable=False)
+            self.channel.basic_qos(prefetch_count=10)
+
+            # Create label queue
+            forward_queue_name = f'label_queue'
+            self.channel.queue_declare(queue=forward_queue_name, durable=False)
+            self.channel.basic_qos(prefetch_count=10)
+            
+            result = 1
 
         if self.event_time:
             src.Log.print_with_color(f"Training time events {self.time_event}", "yellow")

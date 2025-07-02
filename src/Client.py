@@ -11,8 +11,6 @@ from torch import nn
 import src.Log
 import src.Model
 
-
-
 class Client:
     def __init__(self, client_id, layer_id, address, username, password, train_func, device):
         self.client_id = client_id
@@ -59,4 +57,6 @@ class Client:
         src.Log.print_with_color(f"[<<<] Client received: {self.response}", "blue")
         if action == "START":
             if self.layer_id == 1:
+                result, size = self.train_func(model_path, dataset_path)
+            if self.layer_id == 2:
                 result, size = self.train_func(model_path, dataset_path)
