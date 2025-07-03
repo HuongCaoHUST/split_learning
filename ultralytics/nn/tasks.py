@@ -12,6 +12,7 @@ import torch.nn as nn
 import uuid
 import pika
 import pickle
+import time
 from ultralytics.nn.autobackend import check_class_names
 from ultralytics.nn.modules import (
     AIFI,
@@ -171,42 +172,74 @@ class BaseModel(torch.nn.Module):
         Returns:
             (torch.Tensor): The last output of the model.
         """
-        y, dt, embeddings = [], [], []  # outputs
+        dt, embeddings = [], []
         embed = frozenset(embed) if embed is not None else {-1}
         max_idx = max(embed)
         data_store = {}
         start_layer = 3
+        max_retries = 200
+        retry_delay = 1
+
         if self.is_training and self.layer_id == 2:
             queue_name = f'intermediate_queue_{self.layer_id - 1}'
             self.channel = self.connect_rabbitmq()
-            method_frame, header_frame, body = self.channel.basic_get(queue=queue_name, auto_ack=True)
-            if method_frame and body:
-                received_data = pickle.loads(body)
-                print(f"Received data_id: {received_data['data_id']}")
+            for attempt in range(max_retries):
+                method_frame, header_frame, body = self.channel.basic_get(queue=queue_name, auto_ack=True)
+                if method_frame and body:
+                    try:
+                        received_data = pickle.loads(body)
+                        data_store = received_data.get('data_store', {})
+                        if 2 not in data_store:
+                            raise ValueError("Layer 2 output not found in data_store")
+                        x = data_store[2]
+                        if not isinstance(x, torch.Tensor):
+                            raise ValueError("Data from queue is not a valid tensor")
+                        y = [None] * len(self.model)
+                        y[2] = x
+                        print(f"Received data_id: {received_data.get('data_id', 'unknown')}")
+                        break
+                    except (pickle.UnpicklingError, ValueError) as e:
+                        print(f"Error processing queue data: {e}")
+                        if attempt == max_retries - 1:
+                            raise RuntimeError("Failed to process data from queue after max retries")
+                else:
+                    # print(f"No data received from queue, attempt {attempt + 1}/{max_retries}")
+                    if attempt == max_retries - 1:
+                        raise RuntimeError("Queue is empty after max retries")
+                    time.sleep(retry_delay)
+            else:
+                raise RuntimeError("Failed to retrieve data from queue")
+        else:
+            y = [None] * len(self.model)
 
-        for m in self.model:
-            if m.i < start_layer and self.layer_id == 2:
-                print("Skipping layer:", m.i)
-                
-            if m.f != -1:  # if not from previous layer
-                x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
+        start_idx = start_layer if self.is_training and self.layer_id == 2 else 0
+
+        for m in self.model[start_idx:]:
+            if m.f != -1:
+                if isinstance(m.f, int):
+                    x = y[m.f]
+                else:
+                    x = [y[j] if j != -1 else x for j in m.f]
             if profile:
                 self._profile_one_layer(m, x, dt)
-            x = m(x)  # run
-            y.append(x if m.i in self.save else None)  # save output
+
+            # print("M.F:", m.f)
+            
+            x = m(x)
+            if m.i in self.save:
+                y[m.i] = x
             if visualize:
                 feature_visualization(x, m.type, m.i, save_dir=visualize)
 
-            # Forward in client 1
             if self.is_training and m.i in {2} and self.layer_id == 1:
                 data_store[m.i] = x.detach().clone()
                 print(f"Shape of detached tensor at layer {m.i}: {x.detach().shape}")
 
             if m.i in embed:
-                embeddings.append(torch.nn.functional.adaptive_avg_pool2d(x, (1, 1)).squeeze(-1).squeeze(-1))  # flatten
+                embeddings.append(torch.nn.functional.adaptive_avg_pool2d(x, (1, 1)).squeeze(-1).squeeze(-1))
                 if m.i == max_idx:
                     return torch.unbind(torch.cat(embeddings, 1), dim=0)
-        
+
         if self.is_training and self.layer_id == 1:
             self.data_store = data_store
             data_id = uuid.uuid4()
@@ -214,6 +247,7 @@ class BaseModel(torch.nn.Module):
             success = self.send_to_intermediate_queue(data_id, data_store)
             if not success:
                 print(f"Không thể gửi data_store tới intermediate_queue.")
+
         return x
     
     def connect_rabbitmq(self):
