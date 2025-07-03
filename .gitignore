@@ -165,6 +165,5 @@ cython_debug/
 #.idea/
 /datasets
 /rabbitmq_config
-/ultralytics
 /runs
 .idea
