@@ -40,33 +40,27 @@ class Trainning:
         self.channel.queue_declare(queue=queue_name, durable=False)
         self.channel.basic_qos(prefetch_count=10)
         print('Waiting for intermediate output. To exit press CTRL+C')
-        while True:
-            # method_frame, header_frame, body = self.channel.basic_get(queue=queue_name, auto_ack=True)
-            # if method_frame and body:
-                # received_data = pickle.loads(body)
-                # data_id = received_data["data_id"]
-                # data = received_data["label"]
-                # print(f"Received data_id: {data_id}")
-                # print(f"Received data: {data}")
-            src.Log.print_with_color("--- START TRAINING SECOND LAYER ---", "green")
-            args = dict(model=model_path,
-                        data=dataset_path,
-                        epochs=1,
-                        client_id=self.client_id,
-                        layer_id=self.layer_id,
-                        channel=self.channel)
-            trainer = DetectionTrainer(overrides=args)
-            trainer.train()
 
+        src.Log.print_with_color("--- START TRAINING SECOND LAYER ---", "green")
+        args = dict(model=model_path,
+                    data=dataset_path,
+                    epochs=1,
+                    client_id=self.client_id,
+                    layer_id=self.layer_id,
+                    channel=self.channel)
+        trainer = DetectionTrainer(overrides=args)
+        trainer.train()
+
+        print("[>>>] OUT training!")
             # Check training process
-            if method_frame is None:
-                broadcast_queue_name = f'reply_{self.client_id}'
-                method_frame, header_frame, body = self.channel.basic_get(queue=broadcast_queue_name, auto_ack=True)
-                if body:
-                    received_data = pickle.loads(body)
-                    src.Log.print_with_color(f"[<<<] Received message from server {received_data}", "blue")
-                    if received_data["action"] == "PAUSE":
-                        return True
+            # if method_frame is None:
+            #     broadcast_queue_name = f'reply_{self.client_id}'
+            #     method_frame, header_frame, body = self.channel.basic_get(queue=broadcast_queue_name, auto_ack=True)
+            #     if body:
+            #         received_data = pickle.loads(body)
+            #         src.Log.print_with_color(f"[<<<] Received message from server {received_data}", "blue")
+            #         if received_data["action"] == "PAUSE":
+            #             return True
                     
     def train_on_device(self, model_path, dataset_path):
         self.data_count = 0
