@@ -196,7 +196,7 @@ class BaseModel(torch.nn.Module):
                             raise ValueError("Data from queue is not a valid tensor")
                         y = [None] * len(self.model)
                         y[2] = x
-                        print(f"Received data_id: {received_data.get('data_id', 'unknown')}")
+                        print(f"Received TENSOR data_id: {received_data.get('data_id', 'unknown')}")
                         break
                     except (pickle.UnpicklingError, ValueError) as e:
                         print(f"Error processing queue data: {e}")
@@ -247,7 +247,7 @@ class BaseModel(torch.nn.Module):
             success = self.send_to_intermediate_queue(data_id, data_store)
             if not success:
                 print(f"Không thể gửi data_store tới intermediate_queue.")
-
+        print("CHẠY ĐẾN ĐÂY NÈ!!!")
         return x
     
     def connect_rabbitmq(self):

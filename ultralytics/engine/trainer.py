@@ -467,7 +467,7 @@ class BaseTrainer:
                 success = self.send_number_batch(nb)
                 if not success:
                     print(f"Không thể gửi number_batch tới queue.")
-                    
+
                 #Training loop    
                 for i, batch in pbar:
                     self.run_callbacks("on_train_batch_start")
@@ -602,7 +602,7 @@ class BaseTrainer:
                     LOGGER.info(self.progress_string())
                     pbar = enumerate(fake_batches)
                 self.tloss = None
-                print ("Chạy được tới đây rùi!!!")
+
                 #Training loop
                 self.channel= self.connect_rabbitmq()
                 for i, batch in pbar:
@@ -619,7 +619,7 @@ class BaseTrainer:
                             )
                             if "momentum" in x:
                                 x["momentum"] = np.interp(ni, xi, [self.args.warmup_momentum, self.args.momentum])
-
+                    batch = self.wait_for_batch()
                     # Forward
                     with autocast(self.amp):
                         batch = self.preprocess_batch(batch)
@@ -633,6 +633,7 @@ class BaseTrainer:
 
                     # Backward
                     self.scaler.scale(self.loss).backward()
+                    print("Chạy tới BACKWARD")
 
                     # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
                     if ni - last_opt_step >= self.accumulate:
@@ -648,23 +649,23 @@ class BaseTrainer:
                                 self.stop = broadcast_list[0]
                             if self.stop:  # training time exceeded
                                 break
-
-                    # Log
-                    if RANK in {-1, 0}:
-                        loss_length = self.tloss.shape[0] if len(self.tloss.shape) else 1
-                        pbar.set_description(
-                            ("%11s" * 2 + "%11.4g" * (2 + loss_length))
-                            % (
-                                f"{epoch + 1}/{self.epochs}",
-                                f"{self._get_memory():.3g}G",  # (GB) GPU memory util
-                                *(self.tloss if loss_length > 1 else torch.unsqueeze(self.tloss, 0)),  # losses
-                                batch["cls"].shape[0],  # batch size, i.e. 8
-                                batch["img"].shape[-1],  # imgsz, i.e 640
-                            )
-                        )
-                        self.run_callbacks("on_batch_end")
-                        if self.args.plots and ni in self.plot_idx:
-                            self.plot_training_samples(batch, ni)
+                    print("Chạy tới trước LOG")
+                    # # Log
+                    # if RANK in {-1, 0}:
+                    #     loss_length = self.tloss.shape[0] if len(self.tloss.shape) else 1
+                    #     pbar.set_description(
+                    #         ("%11s" * 2 + "%11.4g" * (2 + loss_length))
+                    #         % (
+                    #             f"{epoch + 1}/{self.epochs}",
+                    #             f"{self._get_memory():.3g}G",  # (GB) GPU memory util
+                    #             *(self.tloss if loss_length > 1 else torch.unsqueeze(self.tloss, 0)),  # losses
+                    #             batch["cls"].shape[0],  # batch size, i.e. 8
+                    #             batch["img"].shape[-1],  # imgsz, i.e 640
+                    #         )
+                    #     )
+                    #     self.run_callbacks("on_batch_end")
+                    #     if self.args.plots and ni in self.plot_idx:
+                    #         self.plot_training_samples(batch, ni)
 
                     self.run_callbacks("on_train_batch_end")
 
@@ -764,6 +765,20 @@ class BaseTrainer:
                 received_data = pickle.loads(body)
                 nb = received_data["nb"]
                 return nb
+            else:
+                # print("No data received yet, waiting...")
+                time.sleep(1)
+
+    def wait_for_batch(self):
+        while True:
+            queue_name = f'label_queue'
+            method_frame, header_frame, body = self.channel.basic_get(queue=queue_name, auto_ack=True)
+            if method_frame and body:
+                received_data = pickle.loads(body)
+                data_id = received_data["data_id"]
+                data = received_data["label"]
+                print(f"Received BATCH with data_id: {data_id}")
+                return data
             else:
                 # print("No data received yet, waiting...")
                 time.sleep(1)
