@@ -24,6 +24,7 @@ import pika
 import pickle
 import uuid
 import json
+import tqdm
 from ultralytics import __version__
 from ultralytics.cfg import get_cfg, get_save_dir
 from ultralytics.data.utils import check_cls_dataset, check_det_dataset
@@ -602,7 +603,7 @@ class BaseTrainer:
 
                 if RANK in {-1, 0}:
                     LOGGER.info(self.progress_string())
-                    pbar = enumerate(fake_batches)
+                    pbar = TQDM(enumerate(fake_batches), total=nb)
                 self.tloss = None
 
                 #Training loop
@@ -652,22 +653,22 @@ class BaseTrainer:
                             if self.stop:  # training time exceeded
                                 break
                     print("Chạy tới trước LOG")
-                    # # Log
-                    # if RANK in {-1, 0}:
-                    #     loss_length = self.tloss.shape[0] if len(self.tloss.shape) else 1
-                    #     pbar.set_description(
-                    #         ("%11s" * 2 + "%11.4g" * (2 + loss_length))
-                    #         % (
-                    #             f"{epoch + 1}/{self.epochs}",
-                    #             f"{self._get_memory():.3g}G",  # (GB) GPU memory util
-                    #             *(self.tloss if loss_length > 1 else torch.unsqueeze(self.tloss, 0)),  # losses
-                    #             batch["cls"].shape[0],  # batch size, i.e. 8
-                    #             batch["img"].shape[-1],  # imgsz, i.e 640
-                    #         )
-                    #     )
-                    #     self.run_callbacks("on_batch_end")
-                    #     if self.args.plots and ni in self.plot_idx:
-                    #         self.plot_training_samples(batch, ni)
+                    # Log
+                    if RANK in {-1, 0}:
+                        loss_length = self.tloss.shape[0] if len(self.tloss.shape) else 1
+                        pbar.set_description(
+                            ("%11s" * 2 + "%11.4g" * (2 + loss_length))
+                            % (
+                                f"{epoch + 1}/{self.epochs}",
+                                f"{self._get_memory():.3g}G",  # (GB) GPU memory util
+                                *(self.tloss if loss_length > 1 else torch.unsqueeze(self.tloss, 0)),  # losses
+                                batch["cls"].shape[0],  # batch size, i.e. 8
+                                batch["img"].shape[-1],  # imgsz, i.e 640
+                            )
+                        )
+                        self.run_callbacks("on_batch_end")
+                        if self.args.plots and ni in self.plot_idx:
+                            self.plot_training_samples(batch, ni)
 
                     self.run_callbacks("on_train_batch_end")
 
