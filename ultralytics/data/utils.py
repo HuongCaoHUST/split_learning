@@ -384,7 +384,7 @@ def find_dataset_yaml(path: Path) -> Path:
     return files[0]
 
 
-def check_det_dataset(dataset: str, layer_id: int, autodownload: bool = True) -> Dict:
+def check_det_dataset(dataset: str, layer_id: int = None, autodownload: bool = True) -> Dict:
     """
     Download, verify, and/or unzip a dataset if not found locally.
 

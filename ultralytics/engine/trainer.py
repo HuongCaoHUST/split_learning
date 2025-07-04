@@ -466,7 +466,7 @@ class BaseTrainer:
 
                 # Send number_batch to RabbitMQ
                 self.channel= self.connect_rabbitmq()
-                if epoch <= self.epochs - 1:
+                if epoch == 0:
                     success = self.send_number_batch(nb)
                     if not success:
                         print(f"Không thể gửi number_batch tới queue.")
