@@ -150,6 +150,10 @@ class BaseTrainer:
         if self.device.type in {"cpu", "mps"}:
             self.args.workers = 0  # faster CPU training as time dominated by inference, not dataloading
 
+        #Rabbit MQ
+        self.client_id = self.args.client_id
+        self.layer_id = self.args.layer_id    
+        
         # Model and Dataset
         self.model = check_model_file_from_stem(self.args.model)  # add suffix, i.e. yolo11n -> yolo11n.pt
         with torch_distributed_zero_first(LOCAL_RANK):  # avoid auto-downloading dataset multiple times
@@ -178,9 +182,6 @@ class BaseTrainer:
         if RANK in {-1, 0}:
             callbacks.add_integration_callbacks(self)
 
-        #Rabbit MQ
-        self.client_id = self.args.client_id
-        self.layer_id = self.args.layer_id
         # self.channel = self.args.channel
         self.status_train = False
 
@@ -464,11 +465,12 @@ class BaseTrainer:
 
                 # Send number_batch to RabbitMQ
                 self.channel= self.connect_rabbitmq()
-                success = self.send_number_batch(nb)
-                if not success:
-                    print(f"Không thể gửi number_batch tới queue.")
+                if epoch <= self.epochs - 1:
+                    success = self.send_number_batch(nb)
+                    if not success:
+                        print(f"Không thể gửi number_batch tới queue.")
 
-                #Training loop    
+                #Training loop   
                 for i, batch in pbar:
                     self.run_callbacks("on_train_batch_start")
                     # Warmup
@@ -885,7 +887,7 @@ class BaseTrainer:
                 "pose",
                 "obb",
             }:
-                data = check_det_dataset(self.args.data)
+                data = check_det_dataset(self.args.data, self.layer_id)
                 if "yaml_file" in data:
                     self.args.data = data["yaml_file"]  # for validating 'yolo train data=url.zip' usage
         except Exception as e:
