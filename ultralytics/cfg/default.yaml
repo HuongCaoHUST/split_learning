@@ -129,4 +129,5 @@ tracker: botsort.yaml # (str) tracker type, choices=[botsort.yaml, bytetrack.yam
 
 layer_id: 1
 client_id: abc
+cut_layer: 1
 channel: abc

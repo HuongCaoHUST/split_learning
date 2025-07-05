@@ -142,6 +142,7 @@ class DetectionTrainer(BaseTrainer):
         model = DetectionModel(cfg, nc=self.data["nc"], ch=self.data["channels"], verbose=verbose and RANK == -1,
                             layer_id=getattr(self, 'layer_id', None),
                             client_id=getattr(self, 'client_id', None),
+                            cut_layer=getattr(self, 'cut_layer', None),
                             channel=getattr(self, 'channel', None))
         if weights:
             model.load(weights)

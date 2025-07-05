@@ -22,20 +22,21 @@ class Trainning:
         self.event_time = event_time
         self.time_event = []
 
-    def train_on_first_layer(self, model_path, dataset_path):
+    def train_on_first_layer(self, model_path, dataset_path, cut_layer):
         src.Log.print_with_color("--- START TRAINING FIRST LAYER ---", "green")
         args = dict(model=model_path,
                     data=dataset_path,
                     epochs=2,
                     client_id=self.client_id,
                     layer_id=self.layer_id,
+                    cut_layer=cut_layer,
                     channel=self.channel)
         trainer = DetectionTrainer(overrides=args)
         trainer.train()
 
         # Finish epoch training, send notify to server
         src.Log.print_with_color("[>>>] Finish training!", "red")
-    def train_on_last_layer(self, model_path, dataset_path):
+    def train_on_last_layer(self, model_path, dataset_path, cut_layer):
         queue_name = f'label_queue'
         self.channel.queue_declare(queue=queue_name, durable=False)
         self.channel.basic_qos(prefetch_count=10)
@@ -47,6 +48,7 @@ class Trainning:
                     epochs=2,
                     client_id=self.client_id,
                     layer_id=self.layer_id,
+                    cut_layer=cut_layer,
                     channel=self.channel)
         trainer = DetectionTrainer(overrides=args)
         trainer.train()
@@ -62,7 +64,7 @@ class Trainning:
             #         if received_data["action"] == "PAUSE":
             #             return True
                     
-    def train_on_device(self, model_path, dataset_path):
+    def train_on_device(self, model_path, dataset_path, cut_layer):
         self.data_count = 0
         if self.layer_id == 1:
 
@@ -71,7 +73,7 @@ class Trainning:
             self.channel.queue_declare(queue=forward_queue_name, durable=False)
             self.channel.basic_qos(prefetch_count=10)
 
-            result = self.train_on_first_layer(model_path, dataset_path)
+            result = self.train_on_first_layer(model_path, dataset_path, cut_layer)
 
         elif self.layer_id == 2:
             # Create intermediate queue
@@ -84,7 +86,7 @@ class Trainning:
             self.channel.queue_declare(queue=forward_queue_name, durable=False)
             self.channel.basic_qos(prefetch_count=10)
             
-            result = self.train_on_last_layer(model_path, dataset_path)
+            result = self.train_on_last_layer(model_path, dataset_path, cut_layer)
 
         if self.event_time:
             src.Log.print_with_color(f"Training time events {self.time_event}", "yellow")

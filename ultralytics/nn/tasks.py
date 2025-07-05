@@ -478,7 +478,7 @@ class DetectionModel(BaseModel):
         >>> results = model.predict(image_tensor)
     """
 
-    def __init__(self, cfg="yolo11n.yaml", ch=3, nc=None, verbose=True, layer_id=None, client_id = None, channel = None):
+    def __init__(self, cfg="yolo11n.yaml", ch=3, nc=None, verbose=True, layer_id=None, client_id = None, cut_layer = None, channel = None):
         """
         Initialize the YOLO detection model with the given config and parameters.
 
@@ -514,6 +514,7 @@ class DetectionModel(BaseModel):
 
         self.client_id = client_id
         self.layer_id = layer_id
+        self.cut_layer = cut_layer
         self.is_training = False
         self.data_store=None
         self.channel = channel
