@@ -180,6 +180,7 @@ class BaseModel(torch.nn.Module):
         max_retries = 200
         retry_delay = 1
 
+        print("SELF.CUT_LAYER in task:", self.cut_layer)
         if self.is_training and self.layer_id == 2:
             queue_name = f'intermediate_queue_{self.layer_id - 1}'
             self.channel = self.connect_rabbitmq()
@@ -478,7 +479,9 @@ class DetectionModel(BaseModel):
         >>> results = model.predict(image_tensor)
     """
 
-    def __init__(self, cfg="yolo11n.yaml", ch=3, nc=None, verbose=True, layer_id=None, client_id = None, cut_layer = None, channel = None):
+    def __init__(self, cfg="yolo11n.yaml", ch=3, nc=None, verbose=True,
+                 layer_id=None, client_id = None, cut_layer = None,
+                 address = None, username = None, password = None ,channel = None):
         """
         Initialize the YOLO detection model with the given config and parameters.
 
@@ -515,11 +518,14 @@ class DetectionModel(BaseModel):
         self.client_id = client_id
         self.layer_id = layer_id
         self.cut_layer = cut_layer
+        self.address = address
+        self.username = username
+        self.password = password
         self.is_training = False
         self.data_store=None
         self.channel = channel
-        print(f"Client ID in TASK: {self.client_id}, Layer ID: {self.layer_id}")
-
+        print(f"Client ID in TASK: {self.client_id}, Layer ID: {self.layer_id}", "Cut Layer:", self.cut_layer)
+        print(f"Thông tin RABBITMQ: {self.address}, username: {self.username}, password: {self.password}")
         # Build strides
         m = self.model[-1]  # Detect()
         if isinstance(m, Detect):  # includes all Detect subclasses like Segment, Pose, OBB, YOLOEDetect, YOLOESegment

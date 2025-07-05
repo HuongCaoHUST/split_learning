@@ -143,6 +143,9 @@ class DetectionTrainer(BaseTrainer):
                             layer_id=getattr(self, 'layer_id', None),
                             client_id=getattr(self, 'client_id', None),
                             cut_layer=getattr(self, 'cut_layer', None),
+                            address=getattr(self, 'address', None),
+                            username=getattr(self, 'username', None),
+                            password=getattr(self, 'password', None),
                             channel=getattr(self, 'channel', None))
         if weights:
             model.load(weights)

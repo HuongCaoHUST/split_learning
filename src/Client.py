@@ -58,6 +58,6 @@ class Client:
         src.Log.print_with_color(f"[<<<] Client received: {self.response}", "blue")
         if action == "START":
             if self.layer_id == 1:
-                result, size = self.train_func(model_path, dataset_path, cut_layer)
+                result, size = self.train_func(model_path, dataset_path, cut_layer, self.address, self.username, self.password)
             if self.layer_id == 2:
-                result, size = self.train_func(model_path, dataset_path, cut_layer)
+                result, size = self.train_func(model_path, dataset_path, cut_layer, self.address, self.username, self.password)

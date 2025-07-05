@@ -154,6 +154,12 @@ class BaseTrainer:
         #Rabbit MQ
         self.client_id = self.args.client_id
         self.layer_id = self.args.layer_id    
+        self.address = self.args.address
+        self.username = self.args.username
+        self.password = self.args.password
+        
+        # Cut_layer
+        self.cut_layer = self.args.cut_layer    
         
         # Model and Dataset
         self.model = check_model_file_from_stem(self.args.model)  # add suffix, i.e. yolo11n -> yolo11n.pt
