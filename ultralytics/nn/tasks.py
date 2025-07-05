@@ -178,6 +178,7 @@ class BaseModel(torch.nn.Module):
         data_store = {}
         start_layer = self.cut_layer + 1
         tensor_send_ids = self.get_tensor_send_id (self.cut_layer)  # Layer IDs to send tensors to the queue
+        start_idx = start_layer if self.is_training and self.layer_id == 2 else 0
         max_retries = 200
         retry_delay = 1
 
@@ -190,13 +191,25 @@ class BaseModel(torch.nn.Module):
                     try:
                         received_data = pickle.loads(body)
                         data_store = received_data.get('data_store', {})
-                        if 4 not in data_store:
+                        if not any(tid in data_store for tid in tensor_send_ids):
                             raise ValueError("Layer 2 output not found in data_store")
-                        x = data_store[4]
+                        tensor_id = next(iter(tensor_send_ids))
+                        x = data_store[tensor_id]
                         if not isinstance(x, torch.Tensor):
                             raise ValueError("Data from queue is not a valid tensor")
                         y = [None] * len(self.model)
-                        y[4] = x
+
+                        print("TENSOR SEND IDS", tensor_send_ids)
+                        # Vòng lặp gán Tensor
+                        for tensor_id in tensor_send_ids:
+                            if tensor_id not in data_store:
+                                raise ValueError(f"Expected tensor_id {tensor_id} not found in data_store")
+                            x = data_store[tensor_id]
+                            if not isinstance(x, torch.Tensor):
+                                raise ValueError(f"Data for tensor_id {tensor_id} is not a valid tensor")
+                            # print(f"Received tensor_id {tensor_id}, shape: {x.shape}")
+                            y[tensor_id] = x
+                        
                         print(f"Received TENSOR data_id: {received_data.get('data_id', 'unknown')}")
                         break
                     except (pickle.UnpicklingError, ValueError) as e:
@@ -212,9 +225,7 @@ class BaseModel(torch.nn.Module):
                 raise RuntimeError("Failed to retrieve data from queue")
         else:
             y = [None] * len(self.model)
-
-        start_idx = start_layer if self.is_training and self.layer_id == 2 else 0
-
+            
         for m in self.model[start_idx:]:
             if m.f != -1:
                 if isinstance(m.f, int):
@@ -296,45 +307,45 @@ class BaseModel(torch.nn.Module):
         Trả về tập hợp các ID của các lớp mà mô hình sẽ gửi tensor tới hàng đợi.
         """
         if cut_layer <=3:
-            return {cut_layer}
+            return [cut_layer]
         elif cut_layer == 4:
-            return {cut_layer}
+            return [cut_layer]
         elif cut_layer == 5:
-            return {4, cut_layer}
+            return [4, cut_layer]
         elif cut_layer == 6:
-            return {4, cut_layer}
+            return [4, cut_layer]
         elif cut_layer == 7:
-            return {4, 6, cut_layer}
+            return [4, 6, cut_layer]
         elif cut_layer == 8:
-            return {4, 6, cut_layer}
+            return [4, 6, cut_layer]
         elif cut_layer == 9:
-            return {4, 6, cut_layer}
+            return [4, 6, cut_layer]
         elif cut_layer == 10:
-            return {4, 6, cut_layer}
+            return [4, 6, cut_layer]
         elif cut_layer == 11:
-            return {4, 6, 10, cut_layer}
+            return [4, 6, 10, cut_layer]
         elif cut_layer == 12:
-            return {4, 10, cut_layer}
+            return [4, 10, cut_layer]
         elif cut_layer == 13:
-            return {4, 10, cut_layer}
+            return [4, 10, cut_layer]
         elif cut_layer == 14:
-            return {4, 10, 13,cut_layer}
+            return [4, 10, 13,cut_layer]
         elif cut_layer == 15:
-            return {10, 13, cut_layer}
+            return [10, 13, cut_layer]
         elif cut_layer == 16:
-            return {10, 13, cut_layer}
+            return [10, 13, cut_layer]
         elif cut_layer == 17:
-            return {10, 13, 16, cut_layer}
+            return [10, 13, 16, cut_layer]
         elif cut_layer == 18:
-            return {10, 16, cut_layer}
+            return [10, 16, cut_layer]
         elif cut_layer == 19:
-            return {10, 16, cut_layer}
+            return [10, 16, cut_layer]
         elif cut_layer == 20:
-            return {10, 16, 19, cut_layer}
+            return [10, 16, 19, cut_layer]
         elif cut_layer == 21:
-            return {16, 19, cut_layer}
+            return [16, 19, cut_layer]
         elif cut_layer == 22:
-            return {16, 19, cut_layer}
+            return [16, 19, cut_layer]
 
     def _predict_augment(self, x):
         """Perform augmentations on input image x and return augmented inference."""
