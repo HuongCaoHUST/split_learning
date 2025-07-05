@@ -55,10 +55,9 @@ class Client:
         model_path = self.response.get("model_path")
         dataset_path = self.response.get("dataset_path")
         cut_layer = self.response.get("cut_layer")
-        print("CUT_LAYER:", cut_layer)
         src.Log.print_with_color(f"[<<<] Client received: {self.response}", "blue")
         if action == "START":
             if self.layer_id == 1:
-                result, size = self.train_func(model_path, dataset_path)
+                result, size = self.train_func(model_path, dataset_path, cut_layer)
             if self.layer_id == 2:
-                result, size = self.train_func(model_path, dataset_path)
+                result, size = self.train_func(model_path, dataset_path, cut_layer)
