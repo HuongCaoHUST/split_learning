@@ -176,11 +176,11 @@ class BaseModel(torch.nn.Module):
         embed = frozenset(embed) if embed is not None else {-1}
         max_idx = max(embed)
         data_store = {}
-        start_layer = 3
+        start_layer = self.cut_layer + 1
+        tensor_send_ids = self.get_tensor_send_id (self.cut_layer)  # Layer IDs to send tensors to the queue
         max_retries = 200
         retry_delay = 1
 
-        print("SELF.CUT_LAYER in task:", self.cut_layer)
         if self.is_training and self.layer_id == 2:
             queue_name = f'intermediate_queue_{self.layer_id - 1}'
             self.channel = self.connect_rabbitmq()
@@ -190,13 +190,13 @@ class BaseModel(torch.nn.Module):
                     try:
                         received_data = pickle.loads(body)
                         data_store = received_data.get('data_store', {})
-                        if 2 not in data_store:
+                        if 4 not in data_store:
                             raise ValueError("Layer 2 output not found in data_store")
-                        x = data_store[2]
+                        x = data_store[4]
                         if not isinstance(x, torch.Tensor):
                             raise ValueError("Data from queue is not a valid tensor")
                         y = [None] * len(self.model)
-                        y[2] = x
+                        y[4] = x
                         print(f"Received TENSOR data_id: {received_data.get('data_id', 'unknown')}")
                         break
                     except (pickle.UnpicklingError, ValueError) as e:
@@ -232,7 +232,7 @@ class BaseModel(torch.nn.Module):
             if visualize:
                 feature_visualization(x, m.type, m.i, save_dir=visualize)
 
-            if self.is_training and m.i in {2} and self.layer_id == 1:
+            if self.is_training and m.i in tensor_send_ids and self.layer_id == 1:
                 data_store[m.i] = x.detach().clone()
                 print(f"Shape of detached tensor at layer {m.i}: {x.detach().shape}")
 
@@ -290,6 +290,51 @@ class BaseModel(torch.nn.Module):
 
         print(f"Data_store {data_id} đã được gửi tới {queue_name}")
         return True
+    
+    def get_tensor_send_id (self, cut_layer):
+        """
+        Trả về tập hợp các ID của các lớp mà mô hình sẽ gửi tensor tới hàng đợi.
+        """
+        if cut_layer <=3:
+            return {cut_layer}
+        elif cut_layer == 4:
+            return {cut_layer}
+        elif cut_layer == 5:
+            return {4, cut_layer}
+        elif cut_layer == 6:
+            return {4, cut_layer}
+        elif cut_layer == 7:
+            return {4, 6, cut_layer}
+        elif cut_layer == 8:
+            return {4, 6, cut_layer}
+        elif cut_layer == 9:
+            return {4, 6, cut_layer}
+        elif cut_layer == 10:
+            return {4, 6, cut_layer}
+        elif cut_layer == 11:
+            return {4, 6, 10, cut_layer}
+        elif cut_layer == 12:
+            return {4, 10, cut_layer}
+        elif cut_layer == 13:
+            return {4, 10, cut_layer}
+        elif cut_layer == 14:
+            return {4, 10, 13,cut_layer}
+        elif cut_layer == 15:
+            return {10, 13, cut_layer}
+        elif cut_layer == 16:
+            return {10, 13, cut_layer}
+        elif cut_layer == 17:
+            return {10, 13, 16, cut_layer}
+        elif cut_layer == 18:
+            return {10, 16, cut_layer}
+        elif cut_layer == 19:
+            return {10, 16, cut_layer}
+        elif cut_layer == 20:
+            return {10, 16, 19, cut_layer}
+        elif cut_layer == 21:
+            return {16, 19, cut_layer}
+        elif cut_layer == 22:
+            return {16, 19, cut_layer}
 
     def _predict_augment(self, x):
         """Perform augmentations on input image x and return augmented inference."""
