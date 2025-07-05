@@ -54,6 +54,8 @@ class Client:
         action = self.response["action"]
         model_path = self.response.get("model_path")
         dataset_path = self.response.get("dataset_path")
+        cut_layer = self.response.get("cut_layer")
+        print("CUT_LAYER:", cut_layer)
         src.Log.print_with_color(f"[<<<] Client received: {self.response}", "blue")
         if action == "START":
             if self.layer_id == 1:

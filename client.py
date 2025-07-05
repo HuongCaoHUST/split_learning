@@ -26,6 +26,7 @@ address = config["rabbit"]["address"]
 username = config["rabbit"]["username"]
 password = config["rabbit"]["password"]
 
+
 device = None
 
 if args.device is None:

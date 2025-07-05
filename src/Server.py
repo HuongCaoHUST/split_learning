@@ -74,6 +74,7 @@ class Server:
 
         # Model
         self.model_path = config["model"]["model_path"]
+        self.cut_layer = config["model"]["cut_layer"]
 
         #Dataset
         self.dataset_path = config["dataset"]["dataset_path"]
@@ -126,6 +127,7 @@ class Server:
                             "num_layers": len(self.total_clients),
                             "model_path": self.model_path,
                             "dataset_path": self.dataset_path,
+                            "cut_layer": self.cut_layer,
                             "control_count": self.control_count,
                             "batch_size": self.batch_size,
                             "lr": self.lr,
