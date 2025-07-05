@@ -255,10 +255,6 @@ class BaseModel(torch.nn.Module):
         """
         Thiết lập kết nối tới RabbitMQ và trả về kênh (channel) để sử dụng.
         """
-        self.address = "127.0.0.1"
-        self.username = "user"
-        self.password = "password"
-
         try:
             credentials = pika.PlainCredentials(self.username, self.password)
             parameters = pika.ConnectionParameters(

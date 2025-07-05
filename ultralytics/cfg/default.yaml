@@ -131,6 +131,6 @@ layer_id: 1
 client_id: abc
 cut_layer: 1
 address: 127.0.0.1
-username: user
-password: password
+username: 1
+password: 1
 channel: abc

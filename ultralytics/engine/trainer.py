@@ -197,10 +197,6 @@ class BaseTrainer:
         """
         Thiết lập kết nối tới RabbitMQ và trả về kênh (channel) để sử dụng.
         """
-        self.address = "127.0.0.1"
-        self.username = "user"
-        self.password = "password"
-
         try:
             # Tạo thông tin xác thực
             credentials = pika.PlainCredentials(self.username, self.password)
