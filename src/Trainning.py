@@ -26,7 +26,7 @@ class Trainning:
         src.Log.print_with_color("--- START TRAINING FIRST LAYER ---", "green")
         args = dict(model=model_path,
                     data=dataset_path,
-                    epochs=1,
+                    epochs=2,
                     client_id=self.client_id,
                     layer_id=self.layer_id,
                     cut_layer=cut_layer,
@@ -48,7 +48,7 @@ class Trainning:
         src.Log.print_with_color("--- START TRAINING SECOND LAYER ---", "green")
         args = dict(model=model_path,
                     data=dataset_path,
-                    epochs=1,
+                    epochs=2,
                     client_id=self.client_id,
                     layer_id=self.layer_id,
                     cut_layer=cut_layer,

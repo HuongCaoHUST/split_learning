@@ -497,53 +497,54 @@ class BaseTrainer:
                             success = self.send_label(data_id, batch)
                             if not success:
                                 print(f"Không thể gửi batch {i} tới label_queue.")
-                        loss, self.loss_items = self.model(batch)
-                        self.loss = loss.sum()
-                        if RANK != -1:
-                            self.loss *= world_size
-                        self.tloss = (
-                            (self.tloss * i + self.loss_items) / (i + 1) if self.tloss is not None else self.loss_items
-                        )
+                        preds = self.model(batch["img"])
+                        # loss, self.loss_items = self.model(batch)
+                        # self.loss = loss.sum()
+                        # if RANK != -1:
+                        #     self.loss *= world_size
+                        # self.tloss = (
+                        #     (self.tloss * i + self.loss_items) / (i + 1) if self.tloss is not None else self.loss_items
+                        # )
                         
-                    # Check gradient
-                    success_grad = self.wait_gradient()
-                    if not success_grad:
-                        print(f"Không thấy Gradient trong gradient_queue.")
+                    # # Check gradient
+                    # success_grad = self.wait_gradient()
+                    # if not success_grad:
+                    #     print(f"Không thấy Gradient trong gradient_queue.")
 
                     # Backward
-                    self.scaler.scale(self.loss).backward()
+                    # self.scaler.scale(self.loss).backward()
 
                     # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
-                    if ni - last_opt_step >= self.accumulate:
-                        self.optimizer_step()
-                        last_opt_step = ni
+                    # if ni - last_opt_step >= self.accumulate:
+                    #     self.optimizer_step()
+                    #     last_opt_step = ni
 
-                        # Timed stopping
-                        if self.args.time:
-                            self.stop = (time.time() - self.train_time_start) > (self.args.time * 3600)
-                            if RANK != -1:  # if DDP training
-                                broadcast_list = [self.stop if RANK == 0 else None]
-                                dist.broadcast_object_list(broadcast_list, 0)  # broadcast 'stop' to all ranks
-                                self.stop = broadcast_list[0]
-                            if self.stop:  # training time exceeded
-                                break
+                    #     # Timed stopping
+                    #     if self.args.time:
+                    #         self.stop = (time.time() - self.train_time_start) > (self.args.time * 3600)
+                    #         if RANK != -1:  # if DDP training
+                    #             broadcast_list = [self.stop if RANK == 0 else None]
+                    #             dist.broadcast_object_list(broadcast_list, 0)  # broadcast 'stop' to all ranks
+                    #             self.stop = broadcast_list[0]
+                    #         if self.stop:  # training time exceeded
+                    #             break
 
-                    # Log
-                    if RANK in {-1, 0}:
-                        loss_length = self.tloss.shape[0] if len(self.tloss.shape) else 1
-                        pbar.set_description(
-                            ("%11s" * 2 + "%11.4g" * (2 + loss_length))
-                            % (
-                                f"{epoch + 1}/{self.epochs}",
-                                f"{self._get_memory():.3g}G",  # (GB) GPU memory util
-                                *(self.tloss if loss_length > 1 else torch.unsqueeze(self.tloss, 0)),  # losses
-                                batch["cls"].shape[0],  # batch size, i.e. 8
-                                batch["img"].shape[-1],  # imgsz, i.e 640
-                            )
-                        )
-                        self.run_callbacks("on_batch_end")
-                        if self.args.plots and ni in self.plot_idx:
-                            self.plot_training_samples(batch, ni)
+                    # # Log
+                    # if RANK in {-1, 0}:
+                    #     loss_length = self.tloss.shape[0] if len(self.tloss.shape) else 1
+                    #     pbar.set_description(
+                    #         ("%11s" * 2 + "%11.4g" * (2 + loss_length))
+                    #         % (
+                    #             f"{epoch + 1}/{self.epochs}",
+                    #             f"{self._get_memory():.3g}G",  # (GB) GPU memory util
+                    #             *(self.tloss if loss_length > 1 else torch.unsqueeze(self.tloss, 0)),  # losses
+                    #             batch["cls"].shape[0],  # batch size, i.e. 8
+                    #             batch["img"].shape[-1],  # imgsz, i.e 640
+                    #         )
+                    #     )
+                    #     self.run_callbacks("on_batch_end")
+                    #     if self.args.plots and ni in self.plot_idx:
+                    #         self.plot_training_samples(batch, ni)
 
                     self.run_callbacks("on_train_batch_end")
 
@@ -553,19 +554,21 @@ class BaseTrainer:
                     final_epoch = epoch + 1 >= self.epochs
                     self.ema.update_attr(self.model, include=["yaml", "nc", "args", "names", "stride", "class_weights"])
 
-                    # Validation
-                    if self.args.val or final_epoch or self.stopper.possible_stop or self.stop:
-                        self._clear_memory(threshold=0.5)  # prevent VRAM spike
-                        self.metrics, self.fitness = self.validate()
-                    self.save_metrics(metrics={**self.label_loss_items(self.tloss), **self.metrics, **self.lr})
+                    # # Validation
+                    # if self.args.val or final_epoch or self.stopper.possible_stop or self.stop:
+                    #     self._clear_memory(threshold=0.5)  # prevent VRAM spike
+                    #     self.metrics, self.fitness = self.validate()
+                    # self.save_metrics(metrics={**self.label_loss_items(self.tloss), **self.metrics, **self.lr})
+
+                    # Stopper
                     self.stop |= self.stopper(epoch + 1, self.fitness) or final_epoch
                     if self.args.time:
                         self.stop |= (time.time() - self.train_time_start) > (self.args.time * 3600)
 
-                    # Save model
-                    if self.args.save or final_epoch:
-                        self.save_model()
-                        self.run_callbacks("on_model_save")
+                    # # Save model
+                    # if self.args.save or final_epoch:
+                    #     self.save_model()
+                    #     self.run_callbacks("on_model_save")
 
                 # Scheduler
                 t = time.time()
