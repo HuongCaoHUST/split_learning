@@ -504,6 +504,10 @@ class BaseTrainer:
                         self.tloss = (
                             (self.tloss * i + self.loss_items) / (i + 1) if self.tloss is not None else self.loss_items
                         )
+                    # Check gradient
+                    success_grad = self.wait_gradient()
+                    if not success_grad:
+                        print(f"Không thấy Gradient trong gradient_queue.")
 
                     # Backward
                     self.scaler.scale(self.loss).backward()
@@ -635,9 +639,32 @@ class BaseTrainer:
                         self.tloss = (
                             (self.tloss * i + self.loss_items) / (i + 1) if self.tloss is not None else self.loss_items
                         )
-
+                    
                     # Backward
                     self.scaler.scale(self.loss).backward()
+                    if self.layer_id == 2:
+                        if hasattr(self.model, 'saved_tensor'):
+                            gradient_store = {}  # Dictionary để lưu gradient
+                            for tensor_id, tensor in self.model.saved_tensor.items():
+                                if tensor.grad is not None:
+                                    print(f"Gradient shape của tensor {tensor_id}: {tensor.grad.shape}")  # [batch_size, 32, 160, 160]
+                                    gradient_store[tensor_id] = tensor.grad
+                                else:
+                                    print(f"Gradient của tensor {tensor_id} là None")
+                            
+                            # Gửi gradient qua queue
+                            if gradient_store:
+                                data_id = uuid.uuid4()
+                                success = self.send_gradient(data_id, gradient_store)
+                                if not success:
+                                    print(f"Không thể gửi Gradients {i} tới Gradient_queue.")
+                        
+                        if hasattr(self.model, 'saved_data_store'):
+                            for tensor_id, tensor in self.model.saved_data_store.items():
+                                if tensor.grad is not None:
+                                    print(f"Gradient shape của tensor {tensor_id} (data_store): {tensor.grad.shape}")
+                                else:
+                                    print(f"Gradient của tensor {tensor_id} (data_store) là None")
                     print("Chạy tới BACKWARD")
 
                     # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
@@ -786,6 +813,54 @@ class BaseTrainer:
                 return data
             else:
                 # print("No data received yet, waiting...")
+                time.sleep(1)
+
+    def send_gradient(self, data_id, gradients):
+        queue_name = f'gradient_queue_{self.layer_id - 1}'
+        self.channel.queue_declare(queue_name, durable=False)
+
+        message = pickle.dumps(
+            {"data_id": data_id,
+            "gadients": gradients}
+        )
+
+        self.channel.basic_publish(
+            exchange='',
+            routing_key=queue_name,
+            body=message
+        )
+
+        print(f"Gradients {data_id} đã được gửi tới {queue_name}")
+        return True
+
+    def wait_gradient(self):
+        """
+        Wait for gradient data from the gradient_queue.
+
+        Returns:
+            tuple: (data_id, gradient_store) where data_id is the unique identifier and
+                gradient_store is a dictionary with tensor_id as keys and gradient tensors as values.
+        """
+        while True:
+            queue_name = f'gradient_queue_{self.layer_id}'
+            method_frame, header_frame, body = self.channel.basic_get(queue=queue_name, auto_ack=True)
+            if method_frame and body:
+                try:
+                    received_data = pickle.loads(body)
+                    data_id = received_data.get('data_id')
+                    gradient_store = received_data.get('gadients', {})  # Sử dụng 'gadients' để khớp
+                    if not isinstance(gradient_store, dict):
+                        raise ValueError("Received 'gadients' is not a valid dictionary")
+                    for tensor_id, grad in gradient_store.items():
+                        if not isinstance(grad, torch.Tensor):
+                            raise ValueError(f"Gradient for tensor_id {tensor_id} is not a valid tensor")
+                        print(f"Received gradient for tensor_id {tensor_id}, shape: {grad.shape}")
+                    return data_id, gradient_store
+                except (pickle.UnpicklingError, ValueError) as e:
+                    print(f"Error processing gradient queue data: {e}")
+                    time.sleep(1)
+            else:
+                # print("No gradient data received yet, waiting...")
                 time.sleep(1)
 
     def auto_batch(self, max_num_obj=0):

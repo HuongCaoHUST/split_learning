@@ -197,9 +197,11 @@ class BaseModel(torch.nn.Module):
                         x = data_store[tensor_id]
                         if not isinstance(x, torch.Tensor):
                             raise ValueError("Data from queue is not a valid tensor")
+                        x.requires_grad_(True)
+                        x.retain_grad()
+                        self.saved_tensor = {}
                         y = [None] * len(self.model)
 
-                        print("TENSOR SEND IDS", tensor_send_ids)
                         # Vòng lặp gán Tensor
                         for tensor_id in tensor_send_ids:
                             if tensor_id not in data_store:
@@ -208,6 +210,10 @@ class BaseModel(torch.nn.Module):
                             if not isinstance(x, torch.Tensor):
                                 raise ValueError(f"Data for tensor_id {tensor_id} is not a valid tensor")
                             # print(f"Received tensor_id {tensor_id}, shape: {x.shape}")
+
+                            x.requires_grad_(True)
+                            x.retain_grad()
+                            self.saved_tensor[tensor_id] = x
                             y[tensor_id] = x
                         
                         print(f"Received TENSOR data_id: {received_data.get('data_id', 'unknown')}")
@@ -244,7 +250,8 @@ class BaseModel(torch.nn.Module):
                 feature_visualization(x, m.type, m.i, save_dir=visualize)
 
             if self.is_training and m.i in tensor_send_ids and self.layer_id == 1:
-                data_store[m.i] = x.detach().clone()
+                # data_store[m.i] = x.detach().clone().requires_grad_(True)
+                data_store[m.i] = x.detach().requires_grad_(True)
                 print(f"Shape of detached tensor at layer {m.i}: {x.detach().shape}")
 
             if m.i in embed:
@@ -259,7 +266,6 @@ class BaseModel(torch.nn.Module):
             success = self.send_to_intermediate_queue(data_id, data_store)
             if not success:
                 print(f"Không thể gửi data_store tới intermediate_queue.")
-        print("CHẠY ĐẾN ĐÂY NÈ!!!")
         return x
     
     def connect_rabbitmq(self):
@@ -561,11 +567,6 @@ class DetectionModel(BaseModel):
         self.names = {i: f"{i}" for i in range(self.yaml["nc"])}  # default names dict
         self.inplace = self.yaml.get("inplace", True)
         self.end2end = getattr(self.model[-1], "end2end", False)
-        
-        # Tensor
-        self.layer4_output = None
-        self.layer6_output = None
-        self.layer10_output = None
 
         self.client_id = client_id
         self.layer_id = layer_id
