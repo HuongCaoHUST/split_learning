@@ -504,6 +504,7 @@ class BaseTrainer:
                         self.tloss = (
                             (self.tloss * i + self.loss_items) / (i + 1) if self.tloss is not None else self.loss_items
                         )
+                        
                     # Check gradient
                     success_grad = self.wait_gradient()
                     if not success_grad:
@@ -839,7 +840,7 @@ class BaseTrainer:
 
         Returns:
             tuple: (data_id, gradient_store) where data_id is the unique identifier and
-                gradient_store is a dictionary with tensor_id as keys and gradient tensors as values.
+            gradient_store is a dictionary with tensor_id as keys and gradient tensors as values.
         """
         while True:
             queue_name = f'gradient_queue_{self.layer_id}'
@@ -848,7 +849,7 @@ class BaseTrainer:
                 try:
                     received_data = pickle.loads(body)
                     data_id = received_data.get('data_id')
-                    gradient_store = received_data.get('gadients', {})  # Sử dụng 'gadients' để khớp
+                    gradient_store = received_data.get('gadients', {})
                     if not isinstance(gradient_store, dict):
                         raise ValueError("Received 'gadients' is not a valid dictionary")
                     for tensor_id, grad in gradient_store.items():
