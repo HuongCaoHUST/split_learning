@@ -24,6 +24,7 @@ import pika
 import pickle
 import uuid
 import json
+import tqdm
 from ultralytics import __version__
 from ultralytics.cfg import get_cfg, get_save_dir
 from ultralytics.data.utils import check_cls_dataset, check_det_dataset
@@ -150,6 +151,16 @@ class BaseTrainer:
         if self.device.type in {"cpu", "mps"}:
             self.args.workers = 0  # faster CPU training as time dominated by inference, not dataloading
 
+        #Rabbit MQ
+        self.client_id = self.args.client_id
+        self.layer_id = self.args.layer_id    
+        self.address = self.args.address
+        self.username = self.args.username
+        self.password = self.args.password
+        
+        # Cut_layer
+        self.cut_layer = self.args.cut_layer    
+        
         # Model and Dataset
         self.model = check_model_file_from_stem(self.args.model)  # add suffix, i.e. yolo11n -> yolo11n.pt
         with torch_distributed_zero_first(LOCAL_RANK):  # avoid auto-downloading dataset multiple times
@@ -178,9 +189,6 @@ class BaseTrainer:
         if RANK in {-1, 0}:
             callbacks.add_integration_callbacks(self)
 
-        #Rabbit MQ
-        self.client_id = self.args.client_id
-        self.layer_id = self.args.layer_id
         # self.channel = self.args.channel
         self.status_train = False
 
@@ -189,10 +197,6 @@ class BaseTrainer:
         """
         Thiết lập kết nối tới RabbitMQ và trả về kênh (channel) để sử dụng.
         """
-        self.address = "127.0.0.1"
-        self.username = "user"
-        self.password = "password"
-
         try:
             # Tạo thông tin xác thực
             credentials = pika.PlainCredentials(self.username, self.password)
@@ -464,11 +468,12 @@ class BaseTrainer:
 
                 # Send number_batch to RabbitMQ
                 self.channel= self.connect_rabbitmq()
-                success = self.send_number_batch(nb)
-                if not success:
-                    print(f"Không thể gửi number_batch tới queue.")
+                if epoch == 0:
+                    success = self.send_number_batch(nb)
+                    if not success:
+                        print(f"Không thể gửi number_batch tới queue.")
 
-                #Training loop    
+                #Training loop   
                 for i, batch in pbar:
                     self.run_callbacks("on_train_batch_start")
                     # Warmup
@@ -499,6 +504,11 @@ class BaseTrainer:
                         self.tloss = (
                             (self.tloss * i + self.loss_items) / (i + 1) if self.tloss is not None else self.loss_items
                         )
+                        
+                    # Check gradient
+                    success_grad = self.wait_gradient()
+                    if not success_grad:
+                        print(f"Không thấy Gradient trong gradient_queue.")
 
                     # Backward
                     self.scaler.scale(self.loss).backward()
@@ -600,7 +610,7 @@ class BaseTrainer:
 
                 if RANK in {-1, 0}:
                     LOGGER.info(self.progress_string())
-                    pbar = enumerate(fake_batches)
+                    pbar = TQDM(enumerate(fake_batches), total=nb)
                 self.tloss = None
 
                 #Training loop
@@ -630,9 +640,32 @@ class BaseTrainer:
                         self.tloss = (
                             (self.tloss * i + self.loss_items) / (i + 1) if self.tloss is not None else self.loss_items
                         )
-
+                    
                     # Backward
                     self.scaler.scale(self.loss).backward()
+                    if self.layer_id == 2:
+                        if hasattr(self.model, 'saved_tensor'):
+                            gradient_store = {}  # Dictionary để lưu gradient
+                            for tensor_id, tensor in self.model.saved_tensor.items():
+                                if tensor.grad is not None:
+                                    print(f"Gradient shape của tensor {tensor_id}: {tensor.grad.shape}")  # [batch_size, 32, 160, 160]
+                                    gradient_store[tensor_id] = tensor.grad
+                                else:
+                                    print(f"Gradient của tensor {tensor_id} là None")
+                            
+                            # Gửi gradient qua queue
+                            if gradient_store:
+                                data_id = uuid.uuid4()
+                                success = self.send_gradient(data_id, gradient_store)
+                                if not success:
+                                    print(f"Không thể gửi Gradients {i} tới Gradient_queue.")
+                        
+                        if hasattr(self.model, 'saved_data_store'):
+                            for tensor_id, tensor in self.model.saved_data_store.items():
+                                if tensor.grad is not None:
+                                    print(f"Gradient shape của tensor {tensor_id} (data_store): {tensor.grad.shape}")
+                                else:
+                                    print(f"Gradient của tensor {tensor_id} (data_store) là None")
                     print("Chạy tới BACKWARD")
 
                     # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
@@ -650,22 +683,22 @@ class BaseTrainer:
                             if self.stop:  # training time exceeded
                                 break
                     print("Chạy tới trước LOG")
-                    # # Log
-                    # if RANK in {-1, 0}:
-                    #     loss_length = self.tloss.shape[0] if len(self.tloss.shape) else 1
-                    #     pbar.set_description(
-                    #         ("%11s" * 2 + "%11.4g" * (2 + loss_length))
-                    #         % (
-                    #             f"{epoch + 1}/{self.epochs}",
-                    #             f"{self._get_memory():.3g}G",  # (GB) GPU memory util
-                    #             *(self.tloss if loss_length > 1 else torch.unsqueeze(self.tloss, 0)),  # losses
-                    #             batch["cls"].shape[0],  # batch size, i.e. 8
-                    #             batch["img"].shape[-1],  # imgsz, i.e 640
-                    #         )
-                    #     )
-                    #     self.run_callbacks("on_batch_end")
-                    #     if self.args.plots and ni in self.plot_idx:
-                    #         self.plot_training_samples(batch, ni)
+                    # Log
+                    if RANK in {-1, 0}:
+                        loss_length = self.tloss.shape[0] if len(self.tloss.shape) else 1
+                        pbar.set_description(
+                            ("%11s" * 2 + "%11.4g" * (2 + loss_length))
+                            % (
+                                f"{epoch + 1}/{self.epochs}",
+                                f"{self._get_memory():.3g}G",  # (GB) GPU memory util
+                                *(self.tloss if loss_length > 1 else torch.unsqueeze(self.tloss, 0)),  # losses
+                                batch["cls"].shape[0],  # batch size, i.e. 8
+                                batch["img"].shape[-1],  # imgsz, i.e 640
+                            )
+                        )
+                        self.run_callbacks("on_batch_end")
+                        if self.args.plots and ni in self.plot_idx:
+                            self.plot_training_samples(batch, ni)
 
                     self.run_callbacks("on_train_batch_end")
 
@@ -783,6 +816,54 @@ class BaseTrainer:
                 # print("No data received yet, waiting...")
                 time.sleep(1)
 
+    def send_gradient(self, data_id, gradients):
+        queue_name = f'gradient_queue_{self.layer_id - 1}'
+        self.channel.queue_declare(queue_name, durable=False)
+
+        message = pickle.dumps(
+            {"data_id": data_id,
+            "gadients": gradients}
+        )
+
+        self.channel.basic_publish(
+            exchange='',
+            routing_key=queue_name,
+            body=message
+        )
+
+        print(f"Gradients {data_id} đã được gửi tới {queue_name}")
+        return True
+
+    def wait_gradient(self):
+        """
+        Wait for gradient data from the gradient_queue.
+
+        Returns:
+            tuple: (data_id, gradient_store) where data_id is the unique identifier and
+            gradient_store is a dictionary with tensor_id as keys and gradient tensors as values.
+        """
+        while True:
+            queue_name = f'gradient_queue_{self.layer_id}'
+            method_frame, header_frame, body = self.channel.basic_get(queue=queue_name, auto_ack=True)
+            if method_frame and body:
+                try:
+                    received_data = pickle.loads(body)
+                    data_id = received_data.get('data_id')
+                    gradient_store = received_data.get('gadients', {})
+                    if not isinstance(gradient_store, dict):
+                        raise ValueError("Received 'gadients' is not a valid dictionary")
+                    for tensor_id, grad in gradient_store.items():
+                        if not isinstance(grad, torch.Tensor):
+                            raise ValueError(f"Gradient for tensor_id {tensor_id} is not a valid tensor")
+                        print(f"Received gradient for tensor_id {tensor_id}, shape: {grad.shape}")
+                    return data_id, gradient_store
+                except (pickle.UnpicklingError, ValueError) as e:
+                    print(f"Error processing gradient queue data: {e}")
+                    time.sleep(1)
+            else:
+                # print("No gradient data received yet, waiting...")
+                time.sleep(1)
+
     def auto_batch(self, max_num_obj=0):
         """Calculate optimal batch size based on model and device memory constraints."""
         return check_train_batch_size(
@@ -885,7 +966,7 @@ class BaseTrainer:
                 "pose",
                 "obb",
             }:
-                data = check_det_dataset(self.args.data)
+                data = check_det_dataset(self.args.data, self.layer_id)
                 if "yaml_file" in data:
                     self.args.data = data["yaml_file"]  # for validating 'yolo train data=url.zip' usage
         except Exception as e:

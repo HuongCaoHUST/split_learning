@@ -176,7 +176,9 @@ class BaseModel(torch.nn.Module):
         embed = frozenset(embed) if embed is not None else {-1}
         max_idx = max(embed)
         data_store = {}
-        start_layer = 3
+        start_layer = self.cut_layer + 1
+        tensor_send_ids = self.get_tensor_send_id (self.cut_layer)  # Layer IDs to send tensors to the queue
+        start_idx = start_layer if self.is_training and self.layer_id == 2 else 0
         max_retries = 200
         retry_delay = 1
 
@@ -189,13 +191,31 @@ class BaseModel(torch.nn.Module):
                     try:
                         received_data = pickle.loads(body)
                         data_store = received_data.get('data_store', {})
-                        if 2 not in data_store:
+                        if not any(tid in data_store for tid in tensor_send_ids):
                             raise ValueError("Layer 2 output not found in data_store")
-                        x = data_store[2]
+                        tensor_id = next(iter(tensor_send_ids))
+                        x = data_store[tensor_id]
                         if not isinstance(x, torch.Tensor):
                             raise ValueError("Data from queue is not a valid tensor")
+                        x.requires_grad_(True)
+                        x.retain_grad()
+                        self.saved_tensor = {}
                         y = [None] * len(self.model)
-                        y[2] = x
+
+                        # Vòng lặp gán Tensor
+                        for tensor_id in tensor_send_ids:
+                            if tensor_id not in data_store:
+                                raise ValueError(f"Expected tensor_id {tensor_id} not found in data_store")
+                            x = data_store[tensor_id]
+                            if not isinstance(x, torch.Tensor):
+                                raise ValueError(f"Data for tensor_id {tensor_id} is not a valid tensor")
+                            # print(f"Received tensor_id {tensor_id}, shape: {x.shape}")
+
+                            x.requires_grad_(True)
+                            x.retain_grad()
+                            self.saved_tensor[tensor_id] = x
+                            y[tensor_id] = x
+                        
                         print(f"Received TENSOR data_id: {received_data.get('data_id', 'unknown')}")
                         break
                     except (pickle.UnpicklingError, ValueError) as e:
@@ -211,9 +231,7 @@ class BaseModel(torch.nn.Module):
                 raise RuntimeError("Failed to retrieve data from queue")
         else:
             y = [None] * len(self.model)
-
-        start_idx = start_layer if self.is_training and self.layer_id == 2 else 0
-
+            
         for m in self.model[start_idx:]:
             if m.f != -1:
                 if isinstance(m.f, int):
@@ -231,8 +249,9 @@ class BaseModel(torch.nn.Module):
             if visualize:
                 feature_visualization(x, m.type, m.i, save_dir=visualize)
 
-            if self.is_training and m.i in {2} and self.layer_id == 1:
-                data_store[m.i] = x.detach().clone()
+            if self.is_training and m.i in tensor_send_ids and self.layer_id == 1:
+                # data_store[m.i] = x.detach().clone().requires_grad_(True)
+                data_store[m.i] = x.detach().requires_grad_(True)
                 print(f"Shape of detached tensor at layer {m.i}: {x.detach().shape}")
 
             if m.i in embed:
@@ -247,17 +266,12 @@ class BaseModel(torch.nn.Module):
             success = self.send_to_intermediate_queue(data_id, data_store)
             if not success:
                 print(f"Không thể gửi data_store tới intermediate_queue.")
-        print("CHẠY ĐẾN ĐÂY NÈ!!!")
         return x
     
     def connect_rabbitmq(self):
         """
         Thiết lập kết nối tới RabbitMQ và trả về kênh (channel) để sử dụng.
         """
-        self.address = "127.0.0.1"
-        self.username = "user"
-        self.password = "password"
-
         try:
             credentials = pika.PlainCredentials(self.username, self.password)
             parameters = pika.ConnectionParameters(
@@ -293,6 +307,51 @@ class BaseModel(torch.nn.Module):
 
         print(f"Data_store {data_id} đã được gửi tới {queue_name}")
         return True
+    
+    def get_tensor_send_id (self, cut_layer):
+        """
+        Trả về tập hợp các ID của các lớp mà mô hình sẽ gửi tensor tới hàng đợi.
+        """
+        if cut_layer <=3:
+            return [cut_layer]
+        elif cut_layer == 4:
+            return [cut_layer]
+        elif cut_layer == 5:
+            return [4, cut_layer]
+        elif cut_layer == 6:
+            return [4, cut_layer]
+        elif cut_layer == 7:
+            return [4, 6, cut_layer]
+        elif cut_layer == 8:
+            return [4, 6, cut_layer]
+        elif cut_layer == 9:
+            return [4, 6, cut_layer]
+        elif cut_layer == 10:
+            return [4, 6, cut_layer]
+        elif cut_layer == 11:
+            return [4, 6, 10, cut_layer]
+        elif cut_layer == 12:
+            return [4, 10, cut_layer]
+        elif cut_layer == 13:
+            return [4, 10, cut_layer]
+        elif cut_layer == 14:
+            return [4, 10, 13,cut_layer]
+        elif cut_layer == 15:
+            return [10, 13, cut_layer]
+        elif cut_layer == 16:
+            return [10, 13, cut_layer]
+        elif cut_layer == 17:
+            return [10, 13, 16, cut_layer]
+        elif cut_layer == 18:
+            return [10, 16, cut_layer]
+        elif cut_layer == 19:
+            return [10, 16, cut_layer]
+        elif cut_layer == 20:
+            return [10, 16, 19, cut_layer]
+        elif cut_layer == 21:
+            return [16, 19, cut_layer]
+        elif cut_layer == 22:
+            return [16, 19, cut_layer]
 
     def _predict_augment(self, x):
         """Perform augmentations on input image x and return augmented inference."""
@@ -478,7 +537,9 @@ class DetectionModel(BaseModel):
         >>> results = model.predict(image_tensor)
     """
 
-    def __init__(self, cfg="yolo11n.yaml", ch=3, nc=None, verbose=True, layer_id=None, client_id = None, channel = None):
+    def __init__(self, cfg="yolo11n.yaml", ch=3, nc=None, verbose=True,
+                 layer_id=None, client_id = None, cut_layer = None,
+                 address = None, username = None, password = None ,channel = None):
         """
         Initialize the YOLO detection model with the given config and parameters.
 
@@ -506,19 +567,18 @@ class DetectionModel(BaseModel):
         self.names = {i: f"{i}" for i in range(self.yaml["nc"])}  # default names dict
         self.inplace = self.yaml.get("inplace", True)
         self.end2end = getattr(self.model[-1], "end2end", False)
-        
-        # Tensor
-        self.layer4_output = None
-        self.layer6_output = None
-        self.layer10_output = None
 
         self.client_id = client_id
         self.layer_id = layer_id
+        self.cut_layer = cut_layer
+        self.address = address
+        self.username = username
+        self.password = password
         self.is_training = False
         self.data_store=None
         self.channel = channel
-        print(f"Client ID in TASK: {self.client_id}, Layer ID: {self.layer_id}")
-
+        print(f"Client ID in TASK: {self.client_id}, Layer ID: {self.layer_id}", "Cut Layer:", self.cut_layer)
+        print(f"Thông tin RABBITMQ: {self.address}, username: {self.username}, password: {self.password}")
         # Build strides
         m = self.model[-1]  # Detect()
         if isinstance(m, Detect):  # includes all Detect subclasses like Segment, Pose, OBB, YOLOEDetect, YOLOESegment
