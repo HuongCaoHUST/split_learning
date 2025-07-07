@@ -526,7 +526,7 @@ class BaseTrainer:
                     grad_list = [gradient_dict[t_id] for t_id in gradient_dict.keys()]
 
                     torch.autograd.backward(tensor_list, grad_list)
-                    print("Chạy tới OPTIMIZE")
+
                     # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
                     if ni - last_opt_step >= self.accumulate:
                         self.optimizer_step()
@@ -578,10 +578,10 @@ class BaseTrainer:
                     if self.args.time:
                         self.stop |= (time.time() - self.train_time_start) > (self.args.time * 3600)
 
-                    # # Save model
-                    # if self.args.save or final_epoch:
-                    #     self.save_model()
-                    #     self.run_callbacks("on_model_save")
+                    # Save model
+                    if self.args.save or final_epoch:
+                        self.save_model()
+                        self.run_callbacks("on_model_save")
 
                 # Scheduler
                 t = time.time()
@@ -765,7 +765,7 @@ class BaseTrainer:
             seconds = time.time() - self.train_time_start
             LOGGER.info(f"\n{epoch - self.start_epoch + 1} epochs completed in {seconds / 3600:.3f} hours.")
             self.final_eval()
-            if self.args.plots and self.layer_id == 1:
+            if self.args.plots and self.layer_id != 1:
                 self.plot_metrics()
             self.run_callbacks("on_train_end")
         self._clear_memory()
@@ -992,24 +992,44 @@ class BaseTrainer:
 
         # Serialize ckpt to a byte buffer once (faster than repeated torch.save() calls)
         buffer = io.BytesIO()
-        torch.save(
-            {
-                "epoch": self.epoch,
-                "best_fitness": self.best_fitness,
-                "model": None,  # resume and final checkpoints derive from EMA
-                "ema": deepcopy(self.ema.ema).half(),
-                "updates": self.ema.updates,
-                "optimizer": convert_optimizer_state_dict_to_fp16(deepcopy(self.optimizer.state_dict())),
-                "train_args": vars(self.args),  # save as dict
-                "train_metrics": {**self.metrics, **{"fitness": self.fitness}},
-                "train_results": self.read_results_csv(),
-                "date": datetime.now().isoformat(),
-                "version": __version__,
-                "license": "AGPL-3.0 (https://ultralytics.com/license)",
-                "docs": "https://docs.ultralytics.com",
-            },
-            buffer,
-        )
+        if self.layer_id == 1:
+            torch.save(
+                {
+                    "epoch": self.epoch,
+                    "best_fitness": self.best_fitness,
+                    "model": None,  # resume and final checkpoints derive from EMA
+                    "ema": deepcopy(self.ema.ema).half(),
+                    "updates": self.ema.updates,
+                    "optimizer": convert_optimizer_state_dict_to_fp16(deepcopy(self.optimizer.state_dict())),
+                    "train_args": vars(self.args),  # save as dict
+                    "train_metrics": {**self.metrics, **{"fitness": self.fitness}},
+                    # "train_results": self.read_results_csv(),
+                    "date": datetime.now().isoformat(),
+                    "version": __version__,
+                    "license": "AGPL-3.0 (https://ultralytics.com/license)",
+                    "docs": "https://docs.ultralytics.com",
+                },
+                buffer,
+            )
+        elif self.layer_id == 2:
+            torch.save(
+                {
+                    "epoch": self.epoch,
+                    "best_fitness": self.best_fitness,
+                    "model": None,  # resume and final checkpoints derive from EMA
+                    "ema": deepcopy(self.ema.ema).half(),
+                    "updates": self.ema.updates,
+                    "optimizer": convert_optimizer_state_dict_to_fp16(deepcopy(self.optimizer.state_dict())),
+                    "train_args": vars(self.args),  # save as dict
+                    "train_metrics": {**self.metrics, **{"fitness": self.fitness}},
+                    "train_results": self.read_results_csv(),
+                    "date": datetime.now().isoformat(),
+                    "version": __version__,
+                    "license": "AGPL-3.0 (https://ultralytics.com/license)",
+                    "docs": "https://docs.ultralytics.com",
+                },
+                buffer,
+            )
         serialized_ckpt = buffer.getvalue()  # get the serialized content to save
 
         # Save checkpoints
@@ -1170,9 +1190,10 @@ class BaseTrainer:
                 elif f is self.best:
                     k = "train_results"  # update best.pt train_metrics from last.pt
                     strip_optimizer(f, updates={k: ckpt[k]} if k in ckpt else None)
-                    LOGGER.info(f"\nValidating {f}...")
-                    self.validator.args.plots = self.args.plots
-                    self.metrics = self.validator(model=f)
+                    if self.layer_id != 1:
+                        LOGGER.info(f"\nValidating {f}...")
+                        self.validator.args.plots = self.args.plots
+                        self.metrics = self.validator(model=f)
                     self.metrics.pop("fitness", None)
                     self.run_callbacks("on_fit_epoch_end")
 
