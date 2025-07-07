@@ -17,10 +17,10 @@ rabbit:
 
 model:
   model_path: ./yolo11n.pt
-  cut_layer: 17
+  cut_layer: 10
 
 dataset:
-  dataset_path: ./datasets/coco128.yaml
+  dataset_path: ./datasets/livingroom.yaml
 
 log_path: .
 

@@ -498,6 +498,7 @@ class BaseTrainer:
                             if not success:
                                 print(f"Không thể gửi batch {i} tới label_queue.")
                         preds = self.model(batch["img"])
+
                         # loss, self.loss_items = self.model(batch)
                         # self.loss = loss.sum()
                         # if RANK != -1:
@@ -506,28 +507,40 @@ class BaseTrainer:
                         #     (self.tloss * i + self.loss_items) / (i + 1) if self.tloss is not None else self.loss_items
                         # )
                         
-                    # # Check gradient
+                    # Check gradient
                     # success_grad = self.wait_gradient()
                     # if not success_grad:
                     #     print(f"Không thấy Gradient trong gradient_queue.")
+                    # print("SELF.DATA_STORE: ",self.model.data_store)
+                    success_grad, gradient_dict = self.wait_gradient()
+
+                    if not success_grad:
+                        print("Không thấy Gradient.")
+                        return
+
+                    # torch.autograd.backward([tensor4, tensor6, tensor10], [grad4, grad6, grad10])
 
                     # Backward
                     # self.scaler.scale(self.loss).backward()
+                    tensor_list = [self.model.data_store[t_id] for t_id in gradient_dict.keys()]
+                    grad_list = [gradient_dict[t_id] for t_id in gradient_dict.keys()]
 
+                    torch.autograd.backward(tensor_list, grad_list)
+                    print("Chạy tới OPTIMIZE")
                     # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
-                    # if ni - last_opt_step >= self.accumulate:
-                    #     self.optimizer_step()
-                    #     last_opt_step = ni
+                    if ni - last_opt_step >= self.accumulate:
+                        self.optimizer_step()
+                        last_opt_step = ni
 
-                    #     # Timed stopping
-                    #     if self.args.time:
-                    #         self.stop = (time.time() - self.train_time_start) > (self.args.time * 3600)
-                    #         if RANK != -1:  # if DDP training
-                    #             broadcast_list = [self.stop if RANK == 0 else None]
-                    #             dist.broadcast_object_list(broadcast_list, 0)  # broadcast 'stop' to all ranks
-                    #             self.stop = broadcast_list[0]
-                    #         if self.stop:  # training time exceeded
-                    #             break
+                        # Timed stopping
+                        if self.args.time:
+                            self.stop = (time.time() - self.train_time_start) > (self.args.time * 3600)
+                            if RANK != -1:  # if DDP training
+                                broadcast_list = [self.stop if RANK == 0 else None]
+                                dist.broadcast_object_list(broadcast_list, 0)  # broadcast 'stop' to all ranks
+                                self.stop = broadcast_list[0]
+                            if self.stop:  # training time exceeded
+                                break
 
                     # # Log
                     # if RANK in {-1, 0}:
@@ -842,9 +855,9 @@ class BaseTrainer:
         Wait for gradient data from the gradient_queue.
 
         Returns:
-            tuple: (data_id, gradient_store) where data_id is the unique identifier and
-            gradient_store is a dictionary with tensor_id as keys and gradient tensors as values.
+            tuple: (success_flag, grad4, grad6, grad10)
         """
+        tensor_send_ids = self.get_tensor_send_id(self.cut_layer)
         while True:
             queue_name = f'gradient_queue_{self.layer_id}'
             method_frame, header_frame, body = self.channel.basic_get(queue=queue_name, auto_ack=True)
@@ -852,20 +865,75 @@ class BaseTrainer:
                 try:
                     received_data = pickle.loads(body)
                     data_id = received_data.get('data_id')
-                    gradient_store = received_data.get('gadients', {})
+                    gradient_store = received_data.get('gadients', {})  # 'gadients' typo bạn có thể sửa lại thành 'gradients' nếu cần
+
                     if not isinstance(gradient_store, dict):
                         raise ValueError("Received 'gadients' is not a valid dictionary")
-                    for tensor_id, grad in gradient_store.items():
+
+                    gradient_dict = {}
+
+                    for tensor_id in tensor_send_ids:
+                        grad = gradient_store.get(tensor_id)
+                        if grad is None:
+                            raise ValueError(f"Missing gradient for tensor_id {tensor_id}")
                         if not isinstance(grad, torch.Tensor):
                             raise ValueError(f"Gradient for tensor_id {tensor_id} is not a valid tensor")
                         print(f"Received gradient for tensor_id {tensor_id}, shape: {grad.shape}")
-                    return data_id, gradient_store
+                        gradient_dict[tensor_id] = grad
+
+                    return True, gradient_dict
+
                 except (pickle.UnpicklingError, ValueError) as e:
                     print(f"Error processing gradient queue data: {e}")
                     time.sleep(1)
             else:
                 # print("No gradient data received yet, waiting...")
                 time.sleep(1)
+
+    def get_tensor_send_id (self, cut_layer):
+        """
+        Trả về tập hợp các ID của các lớp mà mô hình sẽ gửi tensor tới hàng đợi.
+        """
+        if cut_layer <=3:
+            return [cut_layer]
+        elif cut_layer == 4:
+            return [cut_layer]
+        elif cut_layer == 5:
+            return [4, cut_layer]
+        elif cut_layer == 6:
+            return [4, cut_layer]
+        elif cut_layer == 7:
+            return [4, 6, cut_layer]
+        elif cut_layer == 8:
+            return [4, 6, cut_layer]
+        elif cut_layer == 9:
+            return [4, 6, cut_layer]
+        elif cut_layer == 10:
+            return [4, 6, cut_layer]
+        elif cut_layer == 11:
+            return [4, 6, 10, cut_layer]
+        elif cut_layer == 12:
+            return [4, 10, cut_layer]
+        elif cut_layer == 13:
+            return [4, 10, cut_layer]
+        elif cut_layer == 14:
+            return [4, 10, 13,cut_layer]
+        elif cut_layer == 15:
+            return [10, 13, cut_layer]
+        elif cut_layer == 16:
+            return [10, 13, cut_layer]
+        elif cut_layer == 17:
+            return [10, 13, 16, cut_layer]
+        elif cut_layer == 18:
+            return [10, 16, cut_layer]
+        elif cut_layer == 19:
+            return [10, 16, cut_layer]
+        elif cut_layer == 20:
+            return [10, 16, 19, cut_layer]
+        elif cut_layer == 21:
+            return [16, 19, cut_layer]
+        elif cut_layer == 22:
+            return [16, 19, cut_layer]
 
     def auto_batch(self, max_num_obj=0):
         """Calculate optimal batch size based on model and device memory constraints."""
