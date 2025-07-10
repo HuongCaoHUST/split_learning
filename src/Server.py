@@ -8,9 +8,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 import requests
-
+from ultralytics.models.yolo.detect import DetectionValidator
 from requests.auth import HTTPBasicAuth
-
+from ultralytics import YOLO
 import src.Model
 import src.Log
 import src.Utils
@@ -128,7 +128,17 @@ class Server:
             self.send_to_client(client_id, pickle.dumps(response))
 
         # self.notify_to_clients(start=False)
-        # sys.exit()                    
+        # sys.exit()             
+        elif action == "UPDATE":
+            best = message["best"]
+            client_id = message["client_id"]
+            src.Log.print_with_color(f"[<<<] Received best model from client: {best}", "blue")
+            if layer_id == 2:
+                print("BEST.pt:", best)
+                args = dict(model=best, data="F:/Do_an/split_learning/datasets/coco128.yaml")
+                validator = DetectionValidator(args=args)
+                validator()
+
         # Ack the message
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
@@ -167,3 +177,32 @@ class Server:
             routing_key=reply_queue_name,
             body=message
         )
+
+    def merge_yolo(client1_pt, client2_pt, yaml_file, cut_layer, save_file='merged.pt'):
+        # Load model cấu hình gốc
+        model = YOLO("yolo11n.yaml")
+
+        # Load checkpoints
+        ckpt1 = torch.load(client1_pt, map_location='cpu')
+        ckpt2 = torch.load(client2_pt, map_location='cpu')
+        state1 = ckpt1['model'] if 'model' in ckpt1 else ckpt1
+        state2 = ckpt2['model'] if 'model' in ckpt2 else ckpt2
+
+        # State dict gốc
+        full_state = model.model.state_dict()
+
+        # Merge
+        for k in state1:
+            if k.startswith('model.') and int(k.split('.')[1]) <= cut_layer:
+                full_state[k] = state1[k]
+
+        for k in state2:
+            if k.startswith('model.') and int(k.split('.')[1]) > cut_layer:
+                full_state[k] = state2[k]
+
+        # Load lại
+        model.model.load_state_dict(full_state, strict=False)
+
+        # Save file pt đầy đủ
+        torch.save({'model': model.model.state_dict()}, save_file)
+        print(f"✅ Đã gộp xong. File lưu tại: {save_file}")
