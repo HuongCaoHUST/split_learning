@@ -699,6 +699,7 @@ class BaseTrainer:
                             if self.stop:  # training time exceeded
                                 break
                     print("Chạy tới trước LOG")
+                    
                     # Log
                     if RANK in {-1, 0}:
                         loss_length = self.tloss.shape[0] if len(self.tloss.shape) else 1

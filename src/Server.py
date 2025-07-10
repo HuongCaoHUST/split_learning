@@ -114,6 +114,21 @@ class Server:
                 src.Log.print_with_color("All clients are connected. Sending notifications.", "green")
                 self.notify_to_clients()
 
+        elif action == "NOTIFY":
+            src.Log.print_with_color(f"[<<<] Received message from client: {message}", "blue")
+            # for (client_id, layer_id) in self.list_clients:
+            message = {"action": "PAUSE",
+                        "message": "Pause training and please send your parameters",
+                        "parameters": None}
+            # self.send_to_client(client_id, pickle.dumps(message))
+            src.Log.print_with_color(f"[>>>] Sent stop training request to client {client_id}", "red")
+            response = {"action": "STOP",
+                        "message": "Stop training!",
+                        "parameters": None}
+            self.send_to_client(client_id, pickle.dumps(response))
+
+        # self.notify_to_clients(start=False)
+        # sys.exit()                    
         # Ack the message
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
@@ -132,11 +147,11 @@ class Server:
                             "batch_size": self.batch_size,
                             "lr": self.lr,
                             "momentum": self.momentum}
-            else:
-                src.Log.print_with_color(f"[>>>] Sent stop training request to client {client_id}", "red")
-                response = {"action": "STOP",
-                            "message": "Stop training!",
-                            "parameters": None}
+            # else:
+            #     src.Log.print_with_color(f"[>>>] Sent stop training request to client {client_id}", "red")
+            #     response = {"action": "STOP",
+            #                 "message": "Stop training!",
+            #                 "parameters": None}
             self.time_start = time.time_ns()
             src.Log.print_with_color(f"[>>>] Sent start training request to client {client_id}", "red")
             self.send_to_client(client_id, pickle.dumps(response))
