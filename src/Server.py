@@ -75,6 +75,8 @@ class Server:
         # Model
         self.model_path = config["model"]["model_path"]
         self.cut_layer = config["model"]["cut_layer"]
+        self.best_model_1 = None
+        self.best_model_2 = None
 
         #Dataset
         self.dataset_path = config["dataset"]["dataset_path"]
@@ -133,11 +135,19 @@ class Server:
             best = message["best"]
             client_id = message["client_id"]
             src.Log.print_with_color(f"[<<<] Received best model from client: {best}", "blue")
+            if layer_id == 1:
+                self.best_model_1 = best
+                print("BEST_1.pt:", self.best_model_1)
             if layer_id == 2:
-                print("BEST.pt:", best)
-                args = dict(model=best, data="F:/Do_an/split_learning/datasets/coco128.yaml")
-                validator = DetectionValidator(args=args)
-                validator()
+                self.best_model_2 = best
+                print("BEST_2.pt:", self.best_model_2)
+                # args = dict(model=self.best_model_2, data="F:/Do_an/split_learning/datasets/coco128.yaml")
+                # validator = DetectionValidator(args=args)
+                # validator()
+                # self.merge_yolo(self.best_model_1, self.best_model_2, self.model_path, self.cut_layer, save_file='merged.pt')
+                # self.merge_yolo('merged.pt')
+                self.merge_yolo_models()
+                sys.exit()
 
         # Ack the message
         ch.basic_ack(delivery_tag=method.delivery_tag)
@@ -178,31 +188,71 @@ class Server:
             body=message
         )
 
-    def merge_yolo(client1_pt, client2_pt, yaml_file, cut_layer, save_file='merged.pt'):
-        # Load model cấu hình gốc
-        model = YOLO("yolo11n.yaml")
+    def merge_yolo(self, save_file='merged.pt'):
+        # Load model client 1
+        model1 = YOLO(self.best_model_1)
+        # Load model client 2
+        model2 = YOLO(self.best_model_2)
 
-        # Load checkpoints
-        ckpt1 = torch.load(client1_pt, map_location='cpu')
-        ckpt2 = torch.load(client2_pt, map_location='cpu')
-        state1 = ckpt1['model'] if 'model' in ckpt1 else ckpt1
-        state2 = ckpt2['model'] if 'model' in ckpt2 else ckpt2
+        # Tách các layer
+        layers_part1 = list(model1.model.children())[:self.cut_layer + 1]
+        layers_part2 = list(model2.model.children())[self.cut_layer + 1:]
 
-        # State dict gốc
-        full_state = model.model.state_dict()
+        # Tạo module mới
+        model_part1 = nn.Sequential(*layers_part1)
+        model_part2 = nn.Sequential(*layers_part2)
 
-        # Merge
-        for k in state1:
-            if k.startswith('model.') and int(k.split('.')[1]) <= cut_layer:
-                full_state[k] = state1[k]
+        # Load state_dict
+        model_part1.load_state_dict(model1.model.state_dict(), strict=False)
+        model_part2.load_state_dict(model2.model.state_dict(), strict=False)
 
-        for k in state2:
-            if k.startswith('model.') and int(k.split('.')[1]) > cut_layer:
-                full_state[k] = state2[k]
+        # Gộp
+        merged_module = nn.Sequential(*list(model_part1.children()), *list(model_part2.children()))
 
-        # Load lại
-        model.model.load_state_dict(full_state, strict=False)
+        # Tạo YOLO mới từ merged_module
+        # Copy cấu hình gốc từ model1
+        merged_model = YOLO(self.best_model_1)
+        merged_model.model = merged_module
 
-        # Save file pt đầy đủ
-        torch.save({'model': model.model.state_dict()}, save_file)
-        print(f"✅ Đã gộp xong. File lưu tại: {save_file}")
+        # (Tùy chọn) Save lại nếu muốn
+        merged_model.save('merged_model.pt')
+        print(f"Model merged created")
+        print("VALIDATION STARTED")
+
+        args = dict(model=merged_model, data="F:/Do_an/split_learning/datasets/coco128.yaml")
+        validator = DetectionValidator(args=args)
+        validator()
+
+        return merged_model
+    
+    def merge_yolo_models(self):
+        # Load 2 model
+        model1 = YOLO(self.best_model_1)
+        model2 = YOLO(self.best_model_2)
+        output_path = "F:/Do_an/split_learning/merged_model.pt"
+
+        # Lấy state_dict
+        state_dict1 = model1.model.state_dict()
+        state_dict2 = model2.model.state_dict()
+
+        # Copy state_dict model2 để chỉnh
+        new_state_dict = state_dict2.copy()
+
+        # Ghép trọng số từ model1 vào model2
+        for k in state_dict1.keys():
+            if k.startswith("model."):
+                try:
+                    # Lấy số block
+                    layer_num = int(k.split('.')[1])
+                    if layer_num <= self.cut_layer:
+                        new_state_dict[k] = state_dict1[k]
+                except:
+                    pass
+
+        # Load lại state_dict vào model2
+        model2.model.load_state_dict(new_state_dict)
+
+        # Lưu model mới
+        model2.save(output_path)
+
+        print(f"✅ Đã ghép xong và lưu tại: {output_path}")

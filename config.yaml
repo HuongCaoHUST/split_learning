@@ -20,7 +20,7 @@ model:
   cut_layer: 5
 
 dataset:
-  dataset_path: ./datasets/coco128.yaml
+  dataset_path: ./datasets/livingroom.yaml
 
 log_path: .
 
