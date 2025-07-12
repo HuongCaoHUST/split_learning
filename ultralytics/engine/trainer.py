@@ -497,21 +497,35 @@ class BaseTrainer:
                             success = self.send_label(data_id, batch)
                             if not success:
                                 print(f"Không thể gửi batch {i} tới label_queue.")
-                        loss, self.loss_items = self.model(batch)
-                        self.loss = loss.sum()
-                        if RANK != -1:
-                            self.loss *= world_size
-                        self.tloss = (
-                            (self.tloss * i + self.loss_items) / (i + 1) if self.tloss is not None else self.loss_items
-                        )
+                        preds = self.model(batch["img"])
+
+                        # loss, self.loss_items = self.model(batch)
+                        # self.loss = loss.sum()
+                        # if RANK != -1:
+                        #     self.loss *= world_size
+                        # self.tloss = (
+                        #     (self.tloss * i + self.loss_items) / (i + 1) if self.tloss is not None else self.loss_items
+                        # )
                         
                     # Check gradient
-                    success_grad = self.wait_gradient()
+                    # success_grad = self.wait_gradient()
+                    # if not success_grad:
+                    #     print(f"Không thấy Gradient trong gradient_queue.")
+                    # print("SELF.DATA_STORE: ",self.model.data_store)
+                    success_grad, gradient_dict = self.wait_gradient()
+
                     if not success_grad:
-                        print(f"Không thấy Gradient trong gradient_queue.")
+                        print("Không thấy Gradient.")
+                        return
+
+                    # torch.autograd.backward([tensor4, tensor6, tensor10], [grad4, grad6, grad10])
 
                     # Backward
-                    self.scaler.scale(self.loss).backward()
+                    # self.scaler.scale(self.loss).backward()
+                    tensor_list = [self.model.data_store[t_id] for t_id in gradient_dict.keys()]
+                    grad_list = [gradient_dict[t_id] for t_id in gradient_dict.keys()]
+
+                    torch.autograd.backward(tensor_list, grad_list)
 
                     # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
                     if ni - last_opt_step >= self.accumulate:
@@ -528,22 +542,22 @@ class BaseTrainer:
                             if self.stop:  # training time exceeded
                                 break
 
-                    # Log
-                    if RANK in {-1, 0}:
-                        loss_length = self.tloss.shape[0] if len(self.tloss.shape) else 1
-                        pbar.set_description(
-                            ("%11s" * 2 + "%11.4g" * (2 + loss_length))
-                            % (
-                                f"{epoch + 1}/{self.epochs}",
-                                f"{self._get_memory():.3g}G",  # (GB) GPU memory util
-                                *(self.tloss if loss_length > 1 else torch.unsqueeze(self.tloss, 0)),  # losses
-                                batch["cls"].shape[0],  # batch size, i.e. 8
-                                batch["img"].shape[-1],  # imgsz, i.e 640
-                            )
-                        )
-                        self.run_callbacks("on_batch_end")
-                        if self.args.plots and ni in self.plot_idx:
-                            self.plot_training_samples(batch, ni)
+                    # # Log
+                    # if RANK in {-1, 0}:
+                    #     loss_length = self.tloss.shape[0] if len(self.tloss.shape) else 1
+                    #     pbar.set_description(
+                    #         ("%11s" * 2 + "%11.4g" * (2 + loss_length))
+                    #         % (
+                    #             f"{epoch + 1}/{self.epochs}",
+                    #             f"{self._get_memory():.3g}G",  # (GB) GPU memory util
+                    #             *(self.tloss if loss_length > 1 else torch.unsqueeze(self.tloss, 0)),  # losses
+                    #             batch["cls"].shape[0],  # batch size, i.e. 8
+                    #             batch["img"].shape[-1],  # imgsz, i.e 640
+                    #         )
+                    #     )
+                    #     self.run_callbacks("on_batch_end")
+                    #     if self.args.plots and ni in self.plot_idx:
+                    #         self.plot_training_samples(batch, ni)
 
                     self.run_callbacks("on_train_batch_end")
 
@@ -553,11 +567,13 @@ class BaseTrainer:
                     final_epoch = epoch + 1 >= self.epochs
                     self.ema.update_attr(self.model, include=["yaml", "nc", "args", "names", "stride", "class_weights"])
 
-                    # Validation
-                    if self.args.val or final_epoch or self.stopper.possible_stop or self.stop:
-                        self._clear_memory(threshold=0.5)  # prevent VRAM spike
-                        self.metrics, self.fitness = self.validate()
-                    self.save_metrics(metrics={**self.label_loss_items(self.tloss), **self.metrics, **self.lr})
+                    # # Validation
+                    # if self.args.val or final_epoch or self.stopper.possible_stop or self.stop:
+                    #     self._clear_memory(threshold=0.5)  # prevent VRAM spike
+                    #     self.metrics, self.fitness = self.validate()
+                    # self.save_metrics(metrics={**self.label_loss_items(self.tloss), **self.metrics, **self.lr})
+
+                    # Stopper
                     self.stop |= self.stopper(epoch + 1, self.fitness) or final_epoch
                     if self.args.time:
                         self.stop |= (time.time() - self.train_time_start) > (self.args.time * 3600)
@@ -604,9 +620,10 @@ class BaseTrainer:
                 fake_batches = [None] * nb
                 pbar = enumerate(fake_batches)
                 # Update dataloader attributes (optional)
-                if epoch == (self.epochs - self.args.close_mosaic):
-                    self._close_dataloader_mosaic()
-                    self.train_loader.reset()
+                if self.layer_id != 2 or self.layer_id != 1:
+                    if epoch == (self.epochs - self.args.close_mosaic):
+                        self._close_dataloader_mosaic()
+                        self.train_loader.reset()
 
                 if RANK in {-1, 0}:
                     LOGGER.info(self.progress_string())
@@ -683,6 +700,7 @@ class BaseTrainer:
                             if self.stop:  # training time exceeded
                                 break
                     print("Chạy tới trước LOG")
+                    
                     # Log
                     if RANK in {-1, 0}:
                         loss_length = self.tloss.shape[0] if len(self.tloss.shape) else 1
@@ -749,7 +767,7 @@ class BaseTrainer:
             seconds = time.time() - self.train_time_start
             LOGGER.info(f"\n{epoch - self.start_epoch + 1} epochs completed in {seconds / 3600:.3f} hours.")
             self.final_eval()
-            if self.args.plots and self.layer_id == 1:
+            if self.args.plots and self.layer_id != 1:
                 self.plot_metrics()
             self.run_callbacks("on_train_end")
         self._clear_memory()
@@ -839,9 +857,9 @@ class BaseTrainer:
         Wait for gradient data from the gradient_queue.
 
         Returns:
-            tuple: (data_id, gradient_store) where data_id is the unique identifier and
-            gradient_store is a dictionary with tensor_id as keys and gradient tensors as values.
+            tuple: (success_flag, grad4, grad6, grad10)
         """
+        tensor_send_ids = self.get_tensor_send_id(self.cut_layer)
         while True:
             queue_name = f'gradient_queue_{self.layer_id}'
             method_frame, header_frame, body = self.channel.basic_get(queue=queue_name, auto_ack=True)
@@ -849,20 +867,75 @@ class BaseTrainer:
                 try:
                     received_data = pickle.loads(body)
                     data_id = received_data.get('data_id')
-                    gradient_store = received_data.get('gadients', {})
+                    gradient_store = received_data.get('gadients', {})  # 'gadients' typo bạn có thể sửa lại thành 'gradients' nếu cần
+
                     if not isinstance(gradient_store, dict):
                         raise ValueError("Received 'gadients' is not a valid dictionary")
-                    for tensor_id, grad in gradient_store.items():
+
+                    gradient_dict = {}
+
+                    for tensor_id in tensor_send_ids:
+                        grad = gradient_store.get(tensor_id)
+                        if grad is None:
+                            raise ValueError(f"Missing gradient for tensor_id {tensor_id}")
                         if not isinstance(grad, torch.Tensor):
                             raise ValueError(f"Gradient for tensor_id {tensor_id} is not a valid tensor")
                         print(f"Received gradient for tensor_id {tensor_id}, shape: {grad.shape}")
-                    return data_id, gradient_store
+                        gradient_dict[tensor_id] = grad
+
+                    return True, gradient_dict
+
                 except (pickle.UnpicklingError, ValueError) as e:
                     print(f"Error processing gradient queue data: {e}")
                     time.sleep(1)
             else:
                 # print("No gradient data received yet, waiting...")
                 time.sleep(1)
+
+    def get_tensor_send_id (self, cut_layer):
+        """
+        Trả về tập hợp các ID của các lớp mà mô hình sẽ gửi tensor tới hàng đợi.
+        """
+        if cut_layer <=3:
+            return [cut_layer]
+        elif cut_layer == 4:
+            return [cut_layer]
+        elif cut_layer == 5:
+            return [4, cut_layer]
+        elif cut_layer == 6:
+            return [4, cut_layer]
+        elif cut_layer == 7:
+            return [4, 6, cut_layer]
+        elif cut_layer == 8:
+            return [4, 6, cut_layer]
+        elif cut_layer == 9:
+            return [4, 6, cut_layer]
+        elif cut_layer == 10:
+            return [4, 6, cut_layer]
+        elif cut_layer == 11:
+            return [4, 6, 10, cut_layer]
+        elif cut_layer == 12:
+            return [4, 10, cut_layer]
+        elif cut_layer == 13:
+            return [4, 10, cut_layer]
+        elif cut_layer == 14:
+            return [4, 10, 13,cut_layer]
+        elif cut_layer == 15:
+            return [10, 13, cut_layer]
+        elif cut_layer == 16:
+            return [10, 13, cut_layer]
+        elif cut_layer == 17:
+            return [10, 13, 16, cut_layer]
+        elif cut_layer == 18:
+            return [10, 16, cut_layer]
+        elif cut_layer == 19:
+            return [10, 16, cut_layer]
+        elif cut_layer == 20:
+            return [10, 16, 19, cut_layer]
+        elif cut_layer == 21:
+            return [16, 19, cut_layer]
+        elif cut_layer == 22:
+            return [16, 19, cut_layer]
 
     def auto_batch(self, max_num_obj=0):
         """Calculate optimal batch size based on model and device memory constraints."""
@@ -921,24 +994,44 @@ class BaseTrainer:
 
         # Serialize ckpt to a byte buffer once (faster than repeated torch.save() calls)
         buffer = io.BytesIO()
-        torch.save(
-            {
-                "epoch": self.epoch,
-                "best_fitness": self.best_fitness,
-                "model": None,  # resume and final checkpoints derive from EMA
-                "ema": deepcopy(self.ema.ema).half(),
-                "updates": self.ema.updates,
-                "optimizer": convert_optimizer_state_dict_to_fp16(deepcopy(self.optimizer.state_dict())),
-                "train_args": vars(self.args),  # save as dict
-                "train_metrics": {**self.metrics, **{"fitness": self.fitness}},
-                "train_results": self.read_results_csv(),
-                "date": datetime.now().isoformat(),
-                "version": __version__,
-                "license": "AGPL-3.0 (https://ultralytics.com/license)",
-                "docs": "https://docs.ultralytics.com",
-            },
-            buffer,
-        )
+        if self.layer_id == 1:
+            torch.save(
+                {
+                    "epoch": self.epoch,
+                    "best_fitness": self.best_fitness,
+                    "model": None,  # resume and final checkpoints derive from EMA
+                    "ema": deepcopy(self.ema.ema).half(),
+                    "updates": self.ema.updates,
+                    "optimizer": convert_optimizer_state_dict_to_fp16(deepcopy(self.optimizer.state_dict())),
+                    "train_args": vars(self.args),  # save as dict
+                    "train_metrics": {**self.metrics, **{"fitness": self.fitness}},
+                    # "train_results": self.read_results_csv(),
+                    "date": datetime.now().isoformat(),
+                    "version": __version__,
+                    "license": "AGPL-3.0 (https://ultralytics.com/license)",
+                    "docs": "https://docs.ultralytics.com",
+                },
+                buffer,
+            )
+        elif self.layer_id == 2:
+            torch.save(
+                {
+                    "epoch": self.epoch,
+                    "best_fitness": self.best_fitness,
+                    "model": None,  # resume and final checkpoints derive from EMA
+                    "ema": deepcopy(self.ema.ema).half(),
+                    "updates": self.ema.updates,
+                    "optimizer": convert_optimizer_state_dict_to_fp16(deepcopy(self.optimizer.state_dict())),
+                    "train_args": vars(self.args),  # save as dict
+                    "train_metrics": {**self.metrics, **{"fitness": self.fitness}},
+                    "train_results": self.read_results_csv(),
+                    "date": datetime.now().isoformat(),
+                    "version": __version__,
+                    "license": "AGPL-3.0 (https://ultralytics.com/license)",
+                    "docs": "https://docs.ultralytics.com",
+                },
+                buffer,
+            )
         serialized_ckpt = buffer.getvalue()  # get the serialized content to save
 
         # Save checkpoints
@@ -1099,9 +1192,10 @@ class BaseTrainer:
                 elif f is self.best:
                     k = "train_results"  # update best.pt train_metrics from last.pt
                     strip_optimizer(f, updates={k: ckpt[k]} if k in ckpt else None)
-                    LOGGER.info(f"\nValidating {f}...")
-                    self.validator.args.plots = self.args.plots
-                    self.metrics = self.validator(model=f)
+                    if self.layer_id != 1:
+                        LOGGER.info(f"\nValidating {f}...")
+                        self.validator.args.plots = self.args.plots
+                        self.metrics = self.validator(model=f)
                     self.metrics.pop("fitness", None)
                     self.run_callbacks("on_fit_epoch_end")
 

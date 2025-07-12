@@ -233,6 +233,9 @@ class BaseModel(torch.nn.Module):
             y = [None] * len(self.model)
             
         for m in self.model[start_idx:]:
+            if m.i == self.cut_layer + 1  and self.layer_id == 1:
+                # print(f"Cut layer {m.i} reached, stopping forward pass.")
+                break
             if m.f != -1:
                 if isinstance(m.f, int):
                     x = y[m.f]

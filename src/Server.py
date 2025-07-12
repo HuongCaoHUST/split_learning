@@ -8,9 +8,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 import requests
-
+from ultralytics.models.yolo.detect import DetectionValidator
 from requests.auth import HTTPBasicAuth
-
+from ultralytics import YOLO
 import src.Model
 import src.Log
 import src.Utils
@@ -69,12 +69,18 @@ class Server:
         self.lr = config["learning"]["learning-rate"]
         self.momentum = config["learning"]["momentum"]
         self.control_count = config["learning"]["control-count"]
+        self.epochs = config["learning"]["epochs"]
+
         self.register_clients = [0 for _ in range(len(self.total_clients))]
         self.list_clients = []
 
         # Model
         self.model_path = config["model"]["model_path"]
         self.cut_layer = config["model"]["cut_layer"]
+        self.output_model = config["model"]["output_model"]
+
+        self.best_model_1 = None
+        self.best_model_2 = None
 
         #Dataset
         self.dataset_path = config["dataset"]["dataset_path"]
@@ -114,6 +120,38 @@ class Server:
                 src.Log.print_with_color("All clients are connected. Sending notifications.", "green")
                 self.notify_to_clients()
 
+        elif action == "NOTIFY":
+            src.Log.print_with_color(f"[<<<] Received message from client: {message}", "blue")
+            # for (client_id, layer_id) in self.list_clients:
+            message = {"action": "PAUSE",
+                        "message": "Pause training and please send your parameters",
+                        "parameters": None}
+            # self.send_to_client(client_id, pickle.dumps(message))
+            src.Log.print_with_color(f"[>>>] Sent stop training request to client {client_id}", "red")
+            response = {"action": "STOP",
+                        "message": "Stop training!",
+                        "parameters": None}
+            self.send_to_client(client_id, pickle.dumps(response))
+
+        # self.notify_to_clients(start=False)
+        # sys.exit()             
+        elif action == "UPDATE":
+            best = message["best"]
+            client_id = message["client_id"]
+            src.Log.print_with_color(f"[<<<] Received best model from client: {best}", "blue")
+            if layer_id == 1:
+                self.best_model_1 = best
+                print("BEST_1.pt:", self.best_model_1)
+            if layer_id == 2:
+                self.best_model_2 = best
+                print("BEST_2.pt:", self.best_model_2)
+
+                merge_model = self.merge_yolo_models()
+                args = dict(model=merge_model, data=self.dataset_path)
+                validator = DetectionValidator(args=args)
+                validator()
+                sys.exit()
+
         # Ack the message
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
@@ -129,14 +167,15 @@ class Server:
                             "dataset_path": self.dataset_path,
                             "cut_layer": self.cut_layer,
                             "control_count": self.control_count,
+                            "epochs": self.epochs,
                             "batch_size": self.batch_size,
                             "lr": self.lr,
                             "momentum": self.momentum}
-            else:
-                src.Log.print_with_color(f"[>>>] Sent stop training request to client {client_id}", "red")
-                response = {"action": "STOP",
-                            "message": "Stop training!",
-                            "parameters": None}
+            # else:
+            #     src.Log.print_with_color(f"[>>>] Sent stop training request to client {client_id}", "red")
+            #     response = {"action": "STOP",
+            #                 "message": "Stop training!",
+            #                 "parameters": None}
             self.time_start = time.time_ns()
             src.Log.print_with_color(f"[>>>] Sent start training request to client {client_id}", "red")
             self.send_to_client(client_id, pickle.dumps(response))
@@ -152,3 +191,29 @@ class Server:
             routing_key=reply_queue_name,
             body=message
         )
+    
+    def merge_yolo_models(self):
+        model1 = YOLO(self.best_model_1)
+        model2 = YOLO(self.best_model_2)
+        output_path = self.output_model
+
+        state_dict1 = model1.model.state_dict()
+        state_dict2 = model2.model.state_dict()
+
+        new_state_dict = state_dict2.copy()
+
+        for k in state_dict1.keys():
+            if k.startswith("model."):
+                try:
+                    layer_num = int(k.split('.')[1])
+                    if layer_num <= self.cut_layer:
+                        new_state_dict[k] = state_dict1[k]
+                except:
+                    pass
+
+        model2.model.load_state_dict(new_state_dict)
+
+        model2.save(output_path)
+
+        print(f"Đã ghép xong model và lưu tại: {output_path}")
+        return output_path

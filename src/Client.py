@@ -31,12 +31,10 @@ class Client:
     def send_to_server(self, message):
         self.connect()
         self.response = None
-
         self.channel.queue_declare('Server_queue', durable=False)
         self.channel.basic_publish(exchange='',
                                    routing_key='Server_queue',
                                    body=pickle.dumps(message))
-
         return self.response
     
     def wait_response(self):
@@ -47,6 +45,7 @@ class Client:
             method_frame, header_frame, body = self.channel.basic_get(queue=reply_queue_name, auto_ack=True)
             if body:
                 status = self.response_message(body)
+                break
             time.sleep(0.5)
 
     def response_message(self, body):
@@ -55,9 +54,22 @@ class Client:
         model_path = self.response.get("model_path")
         dataset_path = self.response.get("dataset_path")
         cut_layer = self.response.get("cut_layer")
-        src.Log.print_with_color(f"[<<<] Client received: {self.response}", "blue")
+        epochs = self.response.get("epochs")
+        batch_size = self.response.get("batch_size")
+        # src.Log.print_with_color(f"[<<<] Client received: {self.response}", "blue")
         if action == "START":
+            src.Log.print_with_color(f"[<<<] Client received: {self.response}", "blue")
             if self.layer_id == 1:
-                result, size = self.train_func(model_path, dataset_path, cut_layer, self.address, self.username, self.password)
+                result, best = self.train_func(model_path, dataset_path, cut_layer, epochs, batch_size, self.address, self.username, self.password)
+
             if self.layer_id == 2:
-                result, size = self.train_func(model_path, dataset_path, cut_layer, self.address, self.username, self.password)
+                result, best = self.train_func(model_path, dataset_path, cut_layer, epochs, batch_size, self.address, self.username, self.password)
+            
+            data = {"action": "UPDATE", "client_id": self.client_id, "layer_id": self.layer_id,
+                    "result": result, "message": "Sent parameters to Server", "best": best}
+            
+            src.Log.print_with_color("[>>>] Client sent parameters to server", "red")
+            self.send_to_server(data)
+            return True
+        elif action == "STOP":
+            return False

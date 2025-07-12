@@ -17,7 +17,8 @@ rabbit:
 
 model:
   model_path: ./yolo11n.pt
-  cut_layer: 2
+  cut_layer: 5
+  output_model: ./merged_model.pt
 
 dataset:
   dataset_path: ./datasets/coco128.yaml
@@ -26,7 +27,7 @@ log_path: .
 
 learning:
   learning-rate: 0.0001
-  epoch: 5
+  epochs: 1
   momentum: 0.5
   batch-size: 16
   control-count: 3
