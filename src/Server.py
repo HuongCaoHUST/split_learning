@@ -69,6 +69,8 @@ class Server:
         self.lr = config["learning"]["learning-rate"]
         self.momentum = config["learning"]["momentum"]
         self.control_count = config["learning"]["control-count"]
+        self.epochs = config["learning"]["epochs"]
+
         self.register_clients = [0 for _ in range(len(self.total_clients))]
         self.list_clients = []
 
@@ -146,7 +148,10 @@ class Server:
                 # validator()
                 # self.merge_yolo(self.best_model_1, self.best_model_2, self.model_path, self.cut_layer, save_file='merged.pt')
                 # self.merge_yolo('merged.pt')
-                self.merge_yolo_models()
+                merge_model = self.merge_yolo_models()
+                args = dict(model=merge_model, data="F:/Do_an/split_learning/datasets/livingroom.yaml")
+                validator = DetectionValidator(args=args)
+                validator()
                 sys.exit()
 
         # Ack the message
@@ -164,6 +169,7 @@ class Server:
                             "dataset_path": self.dataset_path,
                             "cut_layer": self.cut_layer,
                             "control_count": self.control_count,
+                            "epochs": self.epochs,
                             "batch_size": self.batch_size,
                             "lr": self.lr,
                             "momentum": self.momentum}
@@ -187,72 +193,29 @@ class Server:
             routing_key=reply_queue_name,
             body=message
         )
-
-    def merge_yolo(self, save_file='merged.pt'):
-        # Load model client 1
-        model1 = YOLO(self.best_model_1)
-        # Load model client 2
-        model2 = YOLO(self.best_model_2)
-
-        # Tách các layer
-        layers_part1 = list(model1.model.children())[:self.cut_layer + 1]
-        layers_part2 = list(model2.model.children())[self.cut_layer + 1:]
-
-        # Tạo module mới
-        model_part1 = nn.Sequential(*layers_part1)
-        model_part2 = nn.Sequential(*layers_part2)
-
-        # Load state_dict
-        model_part1.load_state_dict(model1.model.state_dict(), strict=False)
-        model_part2.load_state_dict(model2.model.state_dict(), strict=False)
-
-        # Gộp
-        merged_module = nn.Sequential(*list(model_part1.children()), *list(model_part2.children()))
-
-        # Tạo YOLO mới từ merged_module
-        # Copy cấu hình gốc từ model1
-        merged_model = YOLO(self.best_model_1)
-        merged_model.model = merged_module
-
-        # (Tùy chọn) Save lại nếu muốn
-        merged_model.save('merged_model.pt')
-        print(f"Model merged created")
-        print("VALIDATION STARTED")
-
-        args = dict(model=merged_model, data="F:/Do_an/split_learning/datasets/coco128.yaml")
-        validator = DetectionValidator(args=args)
-        validator()
-
-        return merged_model
     
     def merge_yolo_models(self):
-        # Load 2 model
         model1 = YOLO(self.best_model_1)
         model2 = YOLO(self.best_model_2)
         output_path = "F:/Do_an/split_learning/merged_model.pt"
 
-        # Lấy state_dict
         state_dict1 = model1.model.state_dict()
         state_dict2 = model2.model.state_dict()
 
-        # Copy state_dict model2 để chỉnh
         new_state_dict = state_dict2.copy()
 
-        # Ghép trọng số từ model1 vào model2
         for k in state_dict1.keys():
             if k.startswith("model."):
                 try:
-                    # Lấy số block
                     layer_num = int(k.split('.')[1])
                     if layer_num <= self.cut_layer:
                         new_state_dict[k] = state_dict1[k]
                 except:
                     pass
 
-        # Load lại state_dict vào model2
         model2.model.load_state_dict(new_state_dict)
 
-        # Lưu model mới
         model2.save(output_path)
 
-        print(f"✅ Đã ghép xong và lưu tại: {output_path}")
+        print(f"Đã ghép xong model và lưu tại: {output_path}")
+        return output_path

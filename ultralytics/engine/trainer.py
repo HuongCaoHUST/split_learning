@@ -620,9 +620,10 @@ class BaseTrainer:
                 fake_batches = [None] * nb
                 pbar = enumerate(fake_batches)
                 # Update dataloader attributes (optional)
-                if epoch == (self.epochs - self.args.close_mosaic):
-                    self._close_dataloader_mosaic()
-                    self.train_loader.reset()
+                if self.layer_id != 2 or self.layer_id != 1:
+                    if epoch == (self.epochs - self.args.close_mosaic):
+                        self._close_dataloader_mosaic()
+                        self.train_loader.reset()
 
                 if RANK in {-1, 0}:
                     LOGGER.info(self.progress_string())
