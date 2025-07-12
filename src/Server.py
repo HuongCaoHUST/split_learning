@@ -77,6 +77,8 @@ class Server:
         # Model
         self.model_path = config["model"]["model_path"]
         self.cut_layer = config["model"]["cut_layer"]
+        self.output_model = config["model"]["output_model"]
+
         self.best_model_1 = None
         self.best_model_2 = None
 
@@ -143,13 +145,9 @@ class Server:
             if layer_id == 2:
                 self.best_model_2 = best
                 print("BEST_2.pt:", self.best_model_2)
-                # args = dict(model=self.best_model_2, data="F:/Do_an/split_learning/datasets/coco128.yaml")
-                # validator = DetectionValidator(args=args)
-                # validator()
-                # self.merge_yolo(self.best_model_1, self.best_model_2, self.model_path, self.cut_layer, save_file='merged.pt')
-                # self.merge_yolo('merged.pt')
+
                 merge_model = self.merge_yolo_models()
-                args = dict(model=merge_model, data="F:/Do_an/split_learning/datasets/livingroom.yaml")
+                args = dict(model=merge_model, data=self.dataset_path)
                 validator = DetectionValidator(args=args)
                 validator()
                 sys.exit()
@@ -197,7 +195,7 @@ class Server:
     def merge_yolo_models(self):
         model1 = YOLO(self.best_model_1)
         model2 = YOLO(self.best_model_2)
-        output_path = "F:/Do_an/split_learning/merged_model.pt"
+        output_path = self.output_model
 
         state_dict1 = model1.model.state_dict()
         state_dict2 = model2.model.state_dict()
