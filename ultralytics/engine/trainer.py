@@ -192,6 +192,9 @@ class BaseTrainer:
 
         # self.channel = self.args.channel
         self.status_train = False
+        self.count_batch = 0
+        if self.layer_id == 1:
+            self.condition = threading.Condition()
 
 
     def connect_rabbitmq(self):
@@ -469,13 +472,12 @@ class BaseTrainer:
 
                 # Send number_batch to RabbitMQ
                 self.channel= self.connect_rabbitmq()
-                print("Pre-self.channel: ", self.channel)
                 if epoch == 0:
                     success = self.send_number_batch(nb)
                     if not success:
                         print(f"Không thể gửi number_batch tới queue.")
-                # if self.model.is_training == True:
-                #     self.start_thread()
+                if self.model.is_training == True:
+                    self.start_thread()
                 #Training loop   
                 for i, batch in pbar:
                     self.run_callbacks("on_train_batch_start")
@@ -526,7 +528,7 @@ class BaseTrainer:
                             if self.stop:  # training time exceeded
                                 break
                     self.run_callbacks("on_train_batch_end")
-
+                self.wait_all_backward(expected_num=nb)
                 self.lr = {f"lr/pg{ir}": x["lr"] for ir, x in enumerate(self.optimizer.param_groups)}  # for loggers
                 self.run_callbacks("on_train_epoch_end")
                 if RANK in {-1, 0}:
@@ -738,7 +740,6 @@ class BaseTrainer:
         """START THREADING"""
         thread = threading.Thread(target=self.check_gradient, daemon=True)
         thread.start()
-        print(f"Thread đã được khởi động.")
 
     def stop_thread(self):
         """STOP THREADING"""
@@ -895,7 +896,7 @@ class BaseTrainer:
                             tensor_list = [self.model.data_store[t_id] for t_id in gradient_dict.keys()]
                             grad_list = [gradient_dict[t_id] for t_id in gradient_dict.keys()]
                             torch.autograd.backward(tensor_list, grad_list)
-
+                        self.count_batch += 1
                         print(f"Xong 01 Backward cho {data_id} nè!!!!!!!!!!!!!!!!!!")
                 else:
                     print("Thread channel is None or closed")
@@ -906,6 +907,15 @@ class BaseTrainer:
 
         thread_channel.close()
         thread_connection.close()
+    def wait_all_backward(self, expected_num):
+        with self.condition:
+            while self.count_batch < expected_num:
+                print(f"Waiting... Current: {self.count_batch}/{expected_num}")
+                self.condition.wait(timeout=0.5)
+
+            print("Enough gradients received. Continue training.")
+            self.count_batch = 0
+
 
     def get_tensor_send_id (self, cut_layer):
         """
