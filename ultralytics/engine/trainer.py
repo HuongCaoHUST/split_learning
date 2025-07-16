@@ -25,6 +25,7 @@ import pickle
 import uuid
 import json
 import tqdm
+import threading
 from ultralytics import __version__
 from ultralytics.cfg import get_cfg, get_save_dir
 from ultralytics.data.utils import check_cls_dataset, check_det_dataset
@@ -160,7 +161,7 @@ class BaseTrainer:
         
         # Cut_layer
         self.cut_layer = self.args.cut_layer    
-        
+        self.tensor_send_ids = self.get_tensor_send_id(self.cut_layer)
         # Model and Dataset
         self.model = check_model_file_from_stem(self.args.model)  # add suffix, i.e. yolo11n -> yolo11n.pt
         with torch_distributed_zero_first(LOCAL_RANK):  # avoid auto-downloading dataset multiple times
@@ -468,11 +469,13 @@ class BaseTrainer:
 
                 # Send number_batch to RabbitMQ
                 self.channel= self.connect_rabbitmq()
+                print("Pre-self.channel: ", self.channel)
                 if epoch == 0:
                     success = self.send_number_batch(nb)
                     if not success:
                         print(f"Không thể gửi number_batch tới queue.")
-
+                # if self.model.is_training == True:
+                #     self.start_thread()
                 #Training loop   
                 for i, batch in pbar:
                     self.run_callbacks("on_train_batch_start")
@@ -488,7 +491,6 @@ class BaseTrainer:
                             )
                             if "momentum" in x:
                                 x["momentum"] = np.interp(ni, xi, [self.args.warmup_momentum, self.args.momentum])
-
                     # Forward
                     with autocast(self.amp):
                         batch = self.preprocess_batch(batch)
@@ -498,40 +500,22 @@ class BaseTrainer:
                             if not success:
                                 print(f"Không thể gửi batch {i} tới label_queue.")
                         preds = self.model(batch["img"])
+                    # success_grad, gradient_dict = self.wait_gradient()
 
-                        # loss, self.loss_items = self.model(batch)
-                        # self.loss = loss.sum()
-                        # if RANK != -1:
-                        #     self.loss *= world_size
-                        # self.tloss = (
-                        #     (self.tloss * i + self.loss_items) / (i + 1) if self.tloss is not None else self.loss_items
-                        # )
-                        
-                    # Check gradient
-                    # success_grad = self.wait_gradient()
                     # if not success_grad:
-                    #     print(f"Không thấy Gradient trong gradient_queue.")
-                    # print("SELF.DATA_STORE: ",self.model.data_store)
-                    success_grad, gradient_dict = self.wait_gradient()
+                    #     print("Không thấy Gradient.")
+                    #     return
+                    
+                    # # Backward
+                    # tensor_list = [self.model.data_store[t_id] for t_id in gradient_dict.keys()]
+                    # grad_list = [gradient_dict[t_id] for t_id in gradient_dict.keys()]
 
-                    if not success_grad:
-                        print("Không thấy Gradient.")
-                        return
-
-                    # torch.autograd.backward([tensor4, tensor6, tensor10], [grad4, grad6, grad10])
-
-                    # Backward
-                    # self.scaler.scale(self.loss).backward()
-                    tensor_list = [self.model.data_store[t_id] for t_id in gradient_dict.keys()]
-                    grad_list = [gradient_dict[t_id] for t_id in gradient_dict.keys()]
-
-                    torch.autograd.backward(tensor_list, grad_list)
+                    # torch.autograd.backward(tensor_list, grad_list)
 
                     # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
                     if ni - last_opt_step >= self.accumulate:
                         self.optimizer_step()
                         last_opt_step = ni
-
                         # Timed stopping
                         if self.args.time:
                             self.stop = (time.time() - self.train_time_start) > (self.args.time * 3600)
@@ -541,24 +525,6 @@ class BaseTrainer:
                                 self.stop = broadcast_list[0]
                             if self.stop:  # training time exceeded
                                 break
-
-                    # # Log
-                    # if RANK in {-1, 0}:
-                    #     loss_length = self.tloss.shape[0] if len(self.tloss.shape) else 1
-                    #     pbar.set_description(
-                    #         ("%11s" * 2 + "%11.4g" * (2 + loss_length))
-                    #         % (
-                    #             f"{epoch + 1}/{self.epochs}",
-                    #             f"{self._get_memory():.3g}G",  # (GB) GPU memory util
-                    #             *(self.tloss if loss_length > 1 else torch.unsqueeze(self.tloss, 0)),  # losses
-                    #             batch["cls"].shape[0],  # batch size, i.e. 8
-                    #             batch["img"].shape[-1],  # imgsz, i.e 640
-                    #         )
-                    #     )
-                    #     self.run_callbacks("on_batch_end")
-                    #     if self.args.plots and ni in self.plot_idx:
-                    #         self.plot_training_samples(batch, ni)
-
                     self.run_callbacks("on_train_batch_end")
 
                 self.lr = {f"lr/pg{ir}": x["lr"] for ir, x in enumerate(self.optimizer.param_groups)}  # for loggers
@@ -566,12 +532,6 @@ class BaseTrainer:
                 if RANK in {-1, 0}:
                     final_epoch = epoch + 1 >= self.epochs
                     self.ema.update_attr(self.model, include=["yaml", "nc", "args", "names", "stride", "class_weights"])
-
-                    # # Validation
-                    # if self.args.val or final_epoch or self.stopper.possible_stop or self.stop:
-                    #     self._clear_memory(threshold=0.5)  # prevent VRAM spike
-                    #     self.metrics, self.fitness = self.validate()
-                    # self.save_metrics(metrics={**self.label_loss_items(self.tloss), **self.metrics, **self.lr})
 
                     # Stopper
                     self.stop |= self.stopper(epoch + 1, self.fitness) or final_epoch
@@ -774,6 +734,17 @@ class BaseTrainer:
         unset_deterministic()
         self.run_callbacks("teardown")
 
+    def start_thread(self):
+        """START THREADING"""
+        thread = threading.Thread(target=self.check_gradient, daemon=True)
+        thread.start()
+        print(f"Thread đã được khởi động.")
+
+    def stop_thread(self):
+        """STOP THREADING"""
+        self.model.is_training = False
+        print(f"Thread đã dừng.")
+
     def send_label(self, data_id, labels):
         queue_name = f'label_queue'
         self.channel.queue_declare(queue_name, durable=False)
@@ -859,7 +830,6 @@ class BaseTrainer:
         Returns:
             tuple: (success_flag, grad4, grad6, grad10)
         """
-        tensor_send_ids = self.get_tensor_send_id(self.cut_layer)
         while True:
             queue_name = f'gradient_queue_{self.layer_id}'
             method_frame, header_frame, body = self.channel.basic_get(queue=queue_name, auto_ack=True)
@@ -867,14 +837,14 @@ class BaseTrainer:
                 try:
                     received_data = pickle.loads(body)
                     data_id = received_data.get('data_id')
-                    gradient_store = received_data.get('gadients', {})  # 'gadients' typo bạn có thể sửa lại thành 'gradients' nếu cần
+                    gradient_store = received_data.get('gadients', {})
 
                     if not isinstance(gradient_store, dict):
                         raise ValueError("Received 'gadients' is not a valid dictionary")
 
                     gradient_dict = {}
 
-                    for tensor_id in tensor_send_ids:
+                    for tensor_id in self.tensor_send_ids:
                         grad = gradient_store.get(tensor_id)
                         if grad is None:
                             raise ValueError(f"Missing gradient for tensor_id {tensor_id}")
@@ -887,10 +857,55 @@ class BaseTrainer:
 
                 except (pickle.UnpicklingError, ValueError) as e:
                     print(f"Error processing gradient queue data: {e}")
-                    time.sleep(1)
+                    time.sleep(0.5)
             else:
                 # print("No gradient data received yet, waiting...")
-                time.sleep(1)
+                time.sleep(0.5)
+
+    def check_gradient(self):
+        credentials = pika.PlainCredentials(self.username, self.password)
+        parameters = pika.ConnectionParameters(host=self.address, credentials=credentials)
+        thread_connection = pika.BlockingConnection(parameters)
+        thread_channel = thread_connection.channel()
+        queue_name = f'gradient_queue_{self.layer_id}'
+        while self.model.is_training:
+            try:
+                if thread_channel is not None and thread_channel.is_open:
+                    method_frame, header_frame, body = thread_channel.basic_get(queue=queue_name, auto_ack=True)
+                    if method_frame and body:
+                        received_data = pickle.loads(body)
+                        data_id = received_data.get('data_id')
+                        print("\nDATA_ID in thread: ", data_id)
+                        gradient_store = received_data.get('gadients', {})
+                        if not isinstance(gradient_store, dict):
+                            raise ValueError("Received 'gadients' is not a valid dictionary")
+                        
+                        gradient_dict = {}
+
+                        for tensor_id in self.tensor_send_ids:
+                            grad = gradient_store.get(tensor_id)
+                            if grad is None:
+                                raise ValueError(f"Missing gradient for tensor_id {tensor_id}")
+                            if not isinstance(grad, torch.Tensor):
+                                raise ValueError(f"Gradient for tensor_id {tensor_id} is not a valid tensor")
+                            print(f"Received gradient for tensor_id {tensor_id}, shape: {grad.shape}")
+                            gradient_dict[tensor_id] = grad
+
+                            # Backward
+                            tensor_list = [self.model.data_store[t_id] for t_id in gradient_dict.keys()]
+                            grad_list = [gradient_dict[t_id] for t_id in gradient_dict.keys()]
+                            torch.autograd.backward(tensor_list, grad_list)
+
+                        print(f"Xong 01 Backward cho {data_id} nè!!!!!!!!!!!!!!!!!!")
+                else:
+                    print("Thread channel is None or closed")
+            except Exception as e:
+                print("Error in check_gradient thread:", e)
+                break
+            time.sleep(1)
+
+        thread_channel.close()
+        thread_connection.close()
 
     def get_tensor_send_id (self, cut_layer):
         """
