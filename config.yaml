@@ -3,7 +3,7 @@ server:
   num-round: 1
   clients:
     - 1
-    - 1
+    - 2
   model: YOLO11n
   parameters:
     load: True
@@ -16,18 +16,18 @@ rabbit:
   password: password
 
 model:
-  model_path: ./yolo11n.pt
+  model_path: ./yolo11s.pt
   cut_layer: 10
   output_model: ./merged_model.pt
 
 dataset:
-  dataset_path: ./datasets/coco128.yaml
+  dataset_path: ./datasets/livingroom.yaml
 
 log_path: .
 
 learning:
   learning-rate: 0.0001
-  epochs: 2
+  epochs: 3
   momentum: 0.5
   batch-size: 16
   control-count: 3

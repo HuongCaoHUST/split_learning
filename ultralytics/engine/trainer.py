@@ -463,7 +463,7 @@ class BaseTrainer:
                     self.train_loader.reset()
 
                 if RANK in {-1, 0}:
-                    LOGGER.info(self.progress_string())
+                    # LOGGER.info(self.progress_string())
                     pbar = TQDM(enumerate(self.train_loader), total=nb)
                 self.tloss = None
 
@@ -523,6 +523,13 @@ class BaseTrainer:
                                 self.stop = broadcast_list[0]
                             if self.stop:  # training time exceeded
                                 break
+                    # Log
+                    if RANK in {-1, 0}:
+                        pbar.set_description(f"{epoch + 1}/{self.epochs}")
+                        self.run_callbacks("on_batch_end")
+                        if self.args.plots and ni in self.plot_idx:
+                            self.plot_training_samples(batch, ni)
+                            
                     self.run_callbacks("on_train_batch_end")
                 self.wait_all_backward(expected_num=nb)
                 self.lr = {f"lr/pg{ir}": x["lr"] for ir, x in enumerate(self.optimizer.param_groups)}  # for loggers

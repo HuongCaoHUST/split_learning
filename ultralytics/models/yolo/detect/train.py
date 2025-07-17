@@ -147,6 +147,7 @@ class DetectionTrainer(BaseTrainer):
                             username=getattr(self, 'username', None),
                             password=getattr(self, 'password', None),
                             channel=getattr(self, 'channel', None))
+        self.layer_id = getattr(self, 'layer_id', None)
         if weights:
             model.load(weights)
         return model
@@ -178,13 +179,16 @@ class DetectionTrainer(BaseTrainer):
 
     def progress_string(self):
         """Return a formatted string of training progress with epoch, GPU memory, loss, instances and size."""
-        return ("\n" + "%11s" * (4 + len(self.loss_names))) % (
-            "Epoch",
-            "GPU_mem",
-            *self.loss_names,
-            "Instances",
-            "Size",
-        )
+        if self.layer_id == 1:
+            return None
+        elif self.layer_id == 2: 
+            return ("\n" + "%11s" * (4 + len(self.loss_names))) % (
+                "Epoch",
+                "GPU_mem",
+                *self.loss_names,
+                "Instances",
+                "Size",
+            )
 
     def plot_training_samples(self, batch: Dict[str, Any], ni: int) -> None:
         """
