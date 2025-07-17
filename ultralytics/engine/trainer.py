@@ -158,6 +158,8 @@ class BaseTrainer:
         self.address = self.args.address
         self.username = self.args.username
         self.password = self.args.password
+        self.channel= self.connect_rabbitmq()
+        print("Self.channel in trainer: ", self.channel)
         
         # Cut_layer
         self.cut_layer = self.args.cut_layer    
@@ -355,8 +357,6 @@ class BaseTrainer:
                 self.data["train"], batch_size=batch_size, rank=LOCAL_RANK, mode="train"
             )
 
-        # print(f"TRAIN LOADER {self.train_loader} ")
-
         if RANK in {-1, 0}:
             # Note: When training DOTA dataset, double batch size could get OOM on images with >2000 objects.
             self.test_loader = self.get_dataloader(
@@ -406,14 +406,11 @@ class BaseTrainer:
         if world_size > 1:
             self._setup_ddp(world_size)
         self._setup_train(world_size)
-        
+        self.model.channel = self.connect_rabbitmq()
         if self.layer_id == 1:
             nb = len(self.train_loader)  # number of batches
             nw = max(round(self.args.warmup_epochs * nb), 100) if self.args.warmup_epochs > 0 else -1  # warmup iterations
-            # print("NUMBER OF BATCHES:", nb)
-            # print("NUMBER OF WARMUP:", nw) 
         else:
-            self.channel= self.connect_rabbitmq()
             nb = self.wait_for_number_batch()
             nw = 1
         last_opt_step = -1
@@ -471,7 +468,6 @@ class BaseTrainer:
                 self.tloss = None
 
                 # Send number_batch to RabbitMQ
-                self.channel= self.connect_rabbitmq()
                 if epoch == 0:
                     success = self.send_number_batch(nb)
                     if not success:
@@ -581,11 +577,11 @@ class BaseTrainer:
 
                 fake_batches = [None] * nb
                 pbar = enumerate(fake_batches)
-                # Update dataloader attributes (optional)
-                if self.layer_id != 2 or self.layer_id != 1:
-                    if epoch == (self.epochs - self.args.close_mosaic):
-                        self._close_dataloader_mosaic()
-                        self.train_loader.reset()
+                # # Update dataloader attributes (optional)
+                # if self.layer_id != 2 or self.layer_id != 1:
+                #     if epoch == (self.epochs - self.args.close_mosaic):
+                #         self._close_dataloader_mosaic()
+                #         self.train_loader.reset()
 
                 if RANK in {-1, 0}:
                     LOGGER.info(self.progress_string())
@@ -593,7 +589,6 @@ class BaseTrainer:
                 self.tloss = None
 
                 #Training loop
-                self.channel= self.connect_rabbitmq()
                 for i, batch in pbar:
                     self.run_callbacks("on_train_batch_start")
                     # Warmup
@@ -876,7 +871,7 @@ class BaseTrainer:
                     if method_frame and body:
                         received_data = pickle.loads(body)
                         data_id = received_data.get('data_id')
-                        print("\nDATA_ID in thread: ", data_id)
+                        print("\nDATA_ID backward: ", data_id)
                         gradient_store = received_data.get('gadients', {})
                         if not isinstance(gradient_store, dict):
                             raise ValueError("Received 'gadients' is not a valid dictionary")
@@ -897,7 +892,7 @@ class BaseTrainer:
                             grad_list = [gradient_dict[t_id] for t_id in gradient_dict.keys()]
                             torch.autograd.backward(tensor_list, grad_list)
                         self.count_batch += 1
-                        print(f"Xong 01 Backward cho {data_id} nè!!!!!!!!!!!!!!!!!!")
+                        # print(f"Xong 01 Backward cho {data_id} nè!!!!!!!!!!!!!!!!!!")
                 else:
                     print("Thread channel is None or closed")
             except Exception as e:
@@ -910,7 +905,7 @@ class BaseTrainer:
     def wait_all_backward(self, expected_num):
         with self.condition:
             while self.count_batch < expected_num:
-                print(f"Waiting... Current: {self.count_batch}/{expected_num}")
+                # print(f"Waiting... Current: {self.count_batch}/{expected_num}")
                 self.condition.wait(timeout=0.5)
 
             print("Enough gradients received. Continue training.")

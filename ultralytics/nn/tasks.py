@@ -154,7 +154,6 @@ class BaseModel(torch.nn.Module):
         Returns:
             (torch.Tensor): The last output of the model.
         """
-        print ("___PREDICT___")
         if augment:
             return self._predict_augment(x)
         return self._predict_once(x, profile, visualize, embed)
@@ -177,23 +176,21 @@ class BaseModel(torch.nn.Module):
         max_idx = max(embed)
         data_store = {}
         start_layer = self.cut_layer + 1
-        tensor_send_ids = self.get_tensor_send_id (self.cut_layer)  # Layer IDs to send tensors to the queue
         start_idx = start_layer if self.is_training and self.layer_id == 2 else 0
         max_retries = 200
         retry_delay = 1
 
         if self.is_training and self.layer_id == 2:
             queue_name = f'intermediate_queue_{self.layer_id - 1}'
-            self.channel = self.connect_rabbitmq()
             for attempt in range(max_retries):
                 method_frame, header_frame, body = self.channel.basic_get(queue=queue_name, auto_ack=True)
                 if method_frame and body:
                     try:
                         received_data = pickle.loads(body)
                         data_store = received_data.get('data_store', {})
-                        if not any(tid in data_store for tid in tensor_send_ids):
+                        if not any(tid in data_store for tid in self.tensor_send_ids):
                             raise ValueError("Layer 2 output not found in data_store")
-                        tensor_id = next(iter(tensor_send_ids))
+                        tensor_id = next(iter(self.tensor_send_ids))
                         x = data_store[tensor_id]
                         if not isinstance(x, torch.Tensor):
                             raise ValueError("Data from queue is not a valid tensor")
@@ -203,7 +200,7 @@ class BaseModel(torch.nn.Module):
                         y = [None] * len(self.model)
 
                         # Vòng lặp gán Tensor
-                        for tensor_id in tensor_send_ids:
+                        for tensor_id in self.tensor_send_ids:
                             if tensor_id not in data_store:
                                 raise ValueError(f"Expected tensor_id {tensor_id} not found in data_store")
                             x = data_store[tensor_id]
@@ -252,7 +249,7 @@ class BaseModel(torch.nn.Module):
             if visualize:
                 feature_visualization(x, m.type, m.i, save_dir=visualize)
 
-            if self.is_training and m.i in tensor_send_ids and self.layer_id == 1:
+            if self.is_training and m.i in self.tensor_send_ids and self.layer_id == 1:
                 # data_store[m.i] = x.detach().clone().requires_grad_(True)
                 data_store[m.i] = x.detach().requires_grad_(True)
                 print(f"Shape of detached tensor at layer {m.i}: {x.detach().shape}")
@@ -265,7 +262,6 @@ class BaseModel(torch.nn.Module):
         if self.is_training and self.layer_id == 1:
             self.data_store = data_store
             data_id = uuid.uuid4()
-            self.channel = self.connect_rabbitmq()
             success = self.send_to_intermediate_queue(data_id, data_store)
             if not success:
                 print(f"Không thể gửi data_store tới intermediate_queue.")
@@ -315,46 +311,74 @@ class BaseModel(torch.nn.Module):
         """
         Trả về tập hợp các ID của các lớp mà mô hình sẽ gửi tensor tới hàng đợi.
         """
-        if cut_layer <=3:
-            return [cut_layer]
-        elif cut_layer == 4:
-            return [cut_layer]
-        elif cut_layer == 5:
-            return [4, cut_layer]
-        elif cut_layer == 6:
-            return [4, cut_layer]
-        elif cut_layer == 7:
-            return [4, 6, cut_layer]
-        elif cut_layer == 8:
-            return [4, 6, cut_layer]
-        elif cut_layer == 9:
-            return [4, 6, cut_layer]
-        elif cut_layer == 10:
-            return [4, 6, cut_layer]
-        elif cut_layer == 11:
-            return [4, 6, 10, cut_layer]
-        elif cut_layer == 12:
-            return [4, 10, cut_layer]
-        elif cut_layer == 13:
-            return [4, 10, cut_layer]
-        elif cut_layer == 14:
-            return [4, 10, 13,cut_layer]
-        elif cut_layer == 15:
-            return [10, 13, cut_layer]
-        elif cut_layer == 16:
-            return [10, 13, cut_layer]
-        elif cut_layer == 17:
-            return [10, 13, 16, cut_layer]
-        elif cut_layer == 18:
-            return [10, 16, cut_layer]
-        elif cut_layer == 19:
-            return [10, 16, cut_layer]
-        elif cut_layer == 20:
-            return [10, 16, 19, cut_layer]
-        elif cut_layer == 21:
-            return [16, 19, cut_layer]
-        elif cut_layer == 22:
-            return [16, 19, cut_layer]
+        tensor_send_id = []
+        mf_values = []
+        layer_indices = []
+        print("--- CÁC TENSOR ĐẶC BIỆT ---")
+        for idx, m in enumerate(self.model):
+            f = m.f
+            if f != -1:
+                if isinstance(f, int):
+                    f = [f]
+                for fi in f:
+                    if fi != -1:
+                        layer_indices.append(idx)
+                        mf_values.append(fi)
+        mf_values_sorted = sorted(mf_values)
+
+        for value in mf_values_sorted:
+            if value < cut_layer:
+                tensor_send_id.append(value)
+
+        indices_to_mf = dict(zip(layer_indices, mf_values))
+        for idx, val in indices_to_mf.items():
+            if idx <=cut_layer:
+                tensor_send_id.remove(val)
+
+        tensor_send_id.append(cut_layer)
+        print ("SEND tensor id: ", tensor_send_id)
+        return tensor_send_id
+                
+        # if cut_layer <=3:
+        #     return [cut_layer]
+        # elif cut_layer == 4:
+        #     return [cut_layer]
+        # elif cut_layer == 5:
+        #     return [4, cut_layer]
+        # elif cut_layer == 6:
+        #     return [4, cut_layer]
+        # elif cut_layer == 7:
+        #     return [4, 6, cut_layer]
+        # elif cut_layer == 8:
+        #     return [4, 6, cut_layer]
+        # elif cut_layer == 9:
+        #     return [4, 6, cut_layer]
+        # elif cut_layer == 10:
+        #     return [4, 6, cut_layer]
+        # elif cut_layer == 11:
+        #     return [4, 6, 10, cut_layer]
+        # elif cut_layer == 12:
+        #     return [4, 10, cut_layer]
+        # elif cut_layer == 13:
+        #     return [4, 10, cut_layer]
+        # elif cut_layer == 14:
+        #     return [4, 10, 13, cut_layer]
+        # elif cut_layer == 15:
+        #     return [10, 13, cut_layer]
+        # elif cut_layer == 16:
+        #     return [10, 13, cut_layer]
+        # elif cut_layer == 17:
+        #     return [10, 13, 16, cut_layer]
+        # elif cut_layer == 18:
+        #     return [10, 16, cut_layer]
+        # elif cut_layer == 19:
+        #     return [10, 16, cut_layer]
+        # elif cut_layer == 20:
+        #     return [10, 16, 19, cut_layer]
+        # elif cut_layer == 21:
+        #     return [16, 19, cut_layer]
+        # elif cut_layer == 22:
+        #     return [16, 19, cut_layer]
 
     def _predict_augment(self, x):
         """Perform augmentations on input image x and return augmented inference."""
@@ -578,8 +602,9 @@ class DetectionModel(BaseModel):
         self.username = username
         self.password = password
         self.is_training = False
+        self.tensor_send_ids = self.get_tensor_send_id (self.cut_layer)
         self.data_store=None
-        self.channel = channel
+        self.channel = None
         print(f"Client ID in TASK: {self.client_id}, Layer ID: {self.layer_id}", "Cut Layer:", self.cut_layer)
         print(f"Thông tin RABBITMQ: {self.address}, username: {self.username}, password: {self.password}")
         # Build strides

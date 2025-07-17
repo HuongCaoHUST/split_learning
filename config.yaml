@@ -17,7 +17,7 @@ rabbit:
 
 model:
   model_path: ./yolo11n.pt
-  cut_layer: 19
+  cut_layer: 10
   output_model: ./merged_model.pt
 
 dataset:
