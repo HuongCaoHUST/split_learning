@@ -763,7 +763,7 @@ class BaseTrainer:
             body=message
         )
 
-        print(f"Batch {data_id} đã được gửi tới {queue_name}")
+        print(f"Batch {data_id} đã được gửi tới {queue_name}, Kích thước: {len(message)} bytes")
         return True
     
     def send_number_batch(self, nb = None):
@@ -823,7 +823,7 @@ class BaseTrainer:
             body=message
         )
 
-        print(f"Gradients {data_id} đã được gửi tới {queue_name}")
+        print(f"Gradients {data_id} đã được gửi tới {queue_name}, Kích thước: {len(message)} bytes")
         return True
 
     def wait_gradient(self):
@@ -905,7 +905,7 @@ class BaseTrainer:
             except Exception as e:
                 print("Error in check_gradient thread:", e)
                 break
-            time.sleep(1)
+            time.sleep(0.2)
 
         thread_channel.close()
         thread_connection.close()

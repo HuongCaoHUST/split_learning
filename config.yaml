@@ -3,7 +3,7 @@ server:
   num-round: 1
   clients:
     - 1
-    - 2
+    - 1
   model: YOLO11n
   parameters:
     load: True
@@ -16,7 +16,7 @@ rabbit:
   password: password
 
 model:
-  model_path: ./yolo11s.pt
+  model_path: ./yolo11n.pt
   cut_layer: 10
   output_model: ./merged_model.pt
 

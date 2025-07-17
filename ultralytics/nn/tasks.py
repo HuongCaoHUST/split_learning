@@ -304,7 +304,7 @@ class BaseModel(torch.nn.Module):
             body=message
         )
 
-        print(f"Data_store {data_id} đã được gửi tới {queue_name}")
+        print(f"Data_store {data_id} đã được gửi tới {queue_name}, Kích thước: {len(message)} bytes")
         return True
     
     def get_tensor_send_id (self, cut_layer):
