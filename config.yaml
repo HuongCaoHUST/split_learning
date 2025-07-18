@@ -2,7 +2,7 @@ name: Split Learning
 server:
   num-round: 1
   clients:
-    - 1
+    - 2
     - 1
   model: YOLO11n
   parameters:
@@ -21,13 +21,13 @@ model:
   output_model: ./merged_model.pt
 
 dataset:
-  dataset_path: ./datasets/livingroom.yaml
+  dataset_path: ./datasets/coco128.yaml
 
 log_path: .
 
 learning:
   learning-rate: 0.0001
-  epochs: 3
+  epochs: 1
   momentum: 0.5
   batch-size: 16
   control-count: 3

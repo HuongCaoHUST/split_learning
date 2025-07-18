@@ -263,7 +263,7 @@ class BaseModel(torch.nn.Module):
 
         if self.is_training and self.layer_id == 1:
             self.data_store = data_store
-            data_id = uuid.uuid4()
+            data_id = f"{self.client_id}_{uuid.uuid4()}"
             success = self.send_to_intermediate_queue(data_id, data_store)
             if not success:
                 print(f"Không thể gửi data_store tới intermediate_queue.")
@@ -594,7 +594,7 @@ class DetectionModel(BaseModel):
     """
 
     def __init__(self, cfg="yolo11n.yaml", ch=3, nc=None, verbose=True,
-                 layer_id=None, client_id = None, cut_layer = None,
+                 layer_id=None, client_id = None, num_client = None, cut_layer = None,
                  address = None, username = None, password = None ,channel = None):
         """
         Initialize the YOLO detection model with the given config and parameters.
@@ -626,6 +626,7 @@ class DetectionModel(BaseModel):
 
         self.client_id = client_id
         self.layer_id = layer_id
+        self.num_client = num_client
         self.cut_layer = cut_layer
         self.address = address
         self.username = username
@@ -635,7 +636,7 @@ class DetectionModel(BaseModel):
         self.data_store=None
         self.channel = None
         self.input_data_id = None
-        print(f"Client ID in TASK: {self.client_id}, Layer ID: {self.layer_id}", "Cut Layer:", self.cut_layer)
+        print(f"Client ID in TASK: {self.client_id}, Layer ID: {self.layer_id}", "Num_client: ", self.num_client,"Cut Layer:", self.cut_layer)
         print(f"Thông tin RABBITMQ: {self.address}, username: {self.username}, password: {self.password}")
         # Build strides
         m = self.model[-1]  # Detect()

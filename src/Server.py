@@ -162,7 +162,7 @@ class Server:
             if start:
                 response = {"action": "START",
                             "message": "Server accept the connection!",
-                            "num_layers": len(self.total_clients),
+                            "num_client": self.total_clients,
                             "model_path": self.model_path,
                             "dataset_path": self.dataset_path,
                             "cut_layer": self.cut_layer,

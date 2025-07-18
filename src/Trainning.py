@@ -32,10 +32,11 @@ class Trainning:
                                    routing_key='Server_queue',
                                    body=pickle.dumps(message))
 
-    def train_on_first_layer(self, model_path, dataset_path, cut_layer, epochs, batch_size, address = None, username = None, password = None):
+    def train_on_first_layer(self, model_path, dataset_path, num_client, cut_layer, epochs, batch_size, address = None, username = None, password = None):
         src.Log.print_with_color("--- START TRAINING FIRST LAYER ---", "green")
         args = dict(model=model_path,
                     data=dataset_path,
+                    num_client=num_client,
                     epochs=epochs,
                     batch=batch_size,
                     client_id=self.client_id,
@@ -65,7 +66,7 @@ class Trainning:
                 break
             time.sleep(0.5)
 
-    def train_on_last_layer(self, model_path, dataset_path, cut_layer, epochs, batch_size, address = None, username = None, password = None):
+    def train_on_last_layer(self, model_path, dataset_path, num_client, cut_layer, epochs, batch_size, address = None, username = None, password = None):
         queue_name = f'label_queue'
         result = True
         self.channel.queue_declare(queue=queue_name, durable=False)
@@ -75,6 +76,7 @@ class Trainning:
         src.Log.print_with_color("--- START TRAINING SECOND LAYER ---", "green")
         args = dict(model=model_path,
                     data=dataset_path,
+                    num_client=num_client,
                     epochs=epochs,
                     batch=batch_size,
                     client_id=self.client_id,
@@ -105,16 +107,16 @@ class Trainning:
                 break
             time.sleep(0.5)
                     
-    def train_on_device(self, model_path, dataset_path, cut_layer, epochs, batch_size, address, username, password):
+    def train_on_device(self, model_path, dataset_path, num_client,cut_layer, epochs, batch_size, address, username, password):
         self.data_count = 0
         if self.layer_id == 1:
 
             # Create gradient queue
-            forward_queue_name = f'gradient_queue_{self.layer_id}'
+            forward_queue_name = f'gradient_queue_{self.client_id}'
             self.channel.queue_declare(queue=forward_queue_name, durable=False)
             self.channel.basic_qos(prefetch_count=10)
 
-            result = self.train_on_first_layer(model_path, dataset_path, cut_layer, epochs, batch_size, address, username, password)
+            result = self.train_on_first_layer(model_path, dataset_path, num_client,cut_layer, epochs, batch_size, address, username, password)
 
         elif self.layer_id == 2:
             # Create intermediate queue
@@ -127,7 +129,7 @@ class Trainning:
             self.channel.queue_declare(queue=forward_queue_name, durable=False)
             self.channel.basic_qos(prefetch_count=10)
             
-            result = self.train_on_last_layer(model_path, dataset_path, cut_layer, epochs, batch_size, address, username, password)
+            result = self.train_on_last_layer(model_path, dataset_path, num_client,cut_layer, epochs, batch_size, address, username, password)
 
         if self.event_time:
             src.Log.print_with_color(f"Training time events {self.time_event}", "yellow")

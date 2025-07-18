@@ -56,14 +56,15 @@ class Client:
         cut_layer = self.response.get("cut_layer")
         epochs = self.response.get("epochs")
         batch_size = self.response.get("batch_size")
+        num_client = self.response.get("num_client")
         # src.Log.print_with_color(f"[<<<] Client received: {self.response}", "blue")
         if action == "START":
             src.Log.print_with_color(f"[<<<] Client received: {self.response}", "blue")
             if self.layer_id == 1:
-                result, best = self.train_func(model_path, dataset_path, cut_layer, epochs, batch_size, self.address, self.username, self.password)
+                result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, epochs, batch_size, self.address, self.username, self.password)
 
             if self.layer_id == 2:
-                result, best = self.train_func(model_path, dataset_path, cut_layer, epochs, batch_size, self.address, self.username, self.password)
+                result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, epochs, batch_size, self.address, self.username, self.password)
             
             data = {"action": "UPDATE", "client_id": self.client_id, "layer_id": self.layer_id,
                     "result": result, "message": "Sent parameters to Server", "best": best}

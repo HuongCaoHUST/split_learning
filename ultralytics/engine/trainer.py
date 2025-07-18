@@ -155,6 +155,8 @@ class BaseTrainer:
         #Rabbit MQ
         self.client_id = self.args.client_id
         self.layer_id = self.args.layer_id    
+        self.num_client = self.args.num_client
+        self.client_ids = []
         self.address = self.args.address
         self.username = self.args.username
         self.password = self.args.password
@@ -411,7 +413,7 @@ class BaseTrainer:
             nb = len(self.train_loader)  # number of batches
             nw = max(round(self.args.warmup_epochs * nb), 100) if self.args.warmup_epochs > 0 else -1  # warmup iterations
         else:
-            nb = self.wait_for_number_batch()
+            nb = self.wait_for_number_batch_client_id()
             nw = 1
         last_opt_step = -1
         self.epoch_time = None
@@ -469,7 +471,7 @@ class BaseTrainer:
 
                 # Send number_batch to RabbitMQ
                 if epoch == 0:
-                    success = self.send_number_batch(nb)
+                    success = self.send_number_batch_client_id(nb, self.client_id)
                     if not success:
                         print(f"Không thể gửi number_batch tới queue.")
                 if self.model.is_training == True:
@@ -766,12 +768,13 @@ class BaseTrainer:
         print(f"Batch {data_id} đã được gửi tới {queue_name}, Kích thước: {len(message)} bytes")
         return True
     
-    def send_number_batch(self, nb = None):
+    def send_number_batch_client_id(self, nb = None, client_id = None):
         queue_name = f'label_queue'
         self.channel.queue_declare(queue_name, durable=False)
 
         message = pickle.dumps(
-            {"nb": nb}
+            {"nb": nb,
+             "client_id": client_id}
         )
 
         self.channel.basic_publish(
@@ -782,18 +785,25 @@ class BaseTrainer:
         print(f"Number batch đã được gửi tới {queue_name}")
         return True
     
-    def wait_for_number_batch(self):
-        while True:
+    def wait_for_number_batch_client_id(self):
+        expected_messages = self.num_client[0]
+        total_nb = 0
+        received = 0
+        while received < expected_messages:
             queue_name = f'label_queue'
             method_frame, header_frame, body = self.channel.basic_get(queue=queue_name, auto_ack=True)
             if method_frame and body:
                 received_data = pickle.loads(body)
                 nb = received_data["nb"]
-                return nb
+                client_id = received_data["client_id"]
+                if nb is not None and client_id is not None:
+                    total_nb += nb
+                    self.client_ids.append(client_id) 
+                    received += 1
             else:
-                # print("No data received yet, waiting...")
                 time.sleep(1)
-
+        return total_nb
+    
     def wait_for_batch(self):
         while True:
             queue_name = f'label_queue'
@@ -809,7 +819,10 @@ class BaseTrainer:
                 time.sleep(1)
 
     def send_gradient(self, data_id, gradients):
-        queue_name = f'gradient_queue_{self.layer_id - 1}'
+        # queue_name = f'gradient_queue_{self.layer_id - 1}'
+        client_id = data_id.split("_")[0]
+        queue_name = f'gradient_queue_{client_id}'
+
         self.channel.queue_declare(queue_name, durable=False)
 
         message = pickle.dumps(
@@ -870,7 +883,7 @@ class BaseTrainer:
         parameters = pika.ConnectionParameters(host=self.address, credentials=credentials)
         thread_connection = pika.BlockingConnection(parameters)
         thread_channel = thread_connection.channel()
-        queue_name = f'gradient_queue_{self.layer_id}'
+        queue_name = f'gradient_queue_{self.client_id}'
         while self.model.is_training:
             try:
                 if thread_channel is not None and thread_channel.is_open:
