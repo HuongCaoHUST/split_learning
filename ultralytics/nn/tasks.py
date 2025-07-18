@@ -13,6 +13,7 @@ import uuid
 import pika
 import pickle
 import time
+import threading
 from ultralytics.nn.autobackend import check_class_names
 from ultralytics.nn.modules import (
     AIFI,
@@ -188,6 +189,7 @@ class BaseModel(torch.nn.Module):
                     try:
                         received_data = pickle.loads(body)
                         data_store = received_data.get('data_store', {})
+                        self.input_data_id = received_data.get('data_id', 'unknown')
                         if not any(tid in data_store for tid in self.tensor_send_ids):
                             raise ValueError("Layer 2 output not found in data_store")
                         tensor_id = next(iter(self.tensor_send_ids))
@@ -213,7 +215,7 @@ class BaseModel(torch.nn.Module):
                             self.saved_tensor[tensor_id] = x
                             y[tensor_id] = x
                         
-                        print(f"Received TENSOR data_id: {received_data.get('data_id', 'unknown')}")
+                        print(f"Received TENSOR data_id: {self.input_data_id}")
                         break
                     except (pickle.UnpicklingError, ValueError) as e:
                         print(f"Error processing queue data: {e}")
@@ -379,6 +381,33 @@ class BaseModel(torch.nn.Module):
         #     return [16, 19, cut_layer]
         # elif cut_layer == 22:
         #     return [16, 19, cut_layer]
+    
+    def start_thread(self, forward_queue):
+        """START THREADING"""
+        thread = threading.Thread(target=self.check_foward, args= (forward_queue,), daemon=True)
+        thread.start()
+
+    def stop_thread(self):
+        """STOP THREADING"""
+        self.model.is_training = False
+        print(f"Thread đã dừng.")
+
+    def check_foward(self, forward_queue):
+        queue_name = f'intermediate_queue_{self.layer_id - 1}'
+        while True:
+            try:
+                if self.channel is not None and self.channel.is_open:
+                    method_frame, header_frame, body = self.channel.basic_get(queue=queue_name, auto_ack=True)
+                    if method_frame and body:
+                        received_data = pickle.loads(body)
+                        data_id = received_data.get('data_id', {})
+                        print("DATA_ID: ", data_id)
+                else:
+                    print("Thread channel is None or closed")
+            except Exception as e:
+                print("Error in check_forward thread:", e)
+                break
+            time.sleep(0.2)
 
     def _predict_augment(self, x):
         """Perform augmentations on input image x and return augmented inference."""
@@ -605,6 +634,7 @@ class DetectionModel(BaseModel):
         self.tensor_send_ids = self.get_tensor_send_id (self.cut_layer)
         self.data_store=None
         self.channel = None
+        self.input_data_id = None
         print(f"Client ID in TASK: {self.client_id}, Layer ID: {self.layer_id}", "Cut Layer:", self.cut_layer)
         print(f"Thông tin RABBITMQ: {self.address}, username: {self.username}, password: {self.password}")
         # Build strides

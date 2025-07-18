@@ -636,7 +636,7 @@ class BaseTrainer:
                             
                             # Gửi gradient qua queue
                             if gradient_store:
-                                data_id = uuid.uuid4()
+                                data_id = self.model.input_data_id
                                 success = self.send_gradient(data_id, gradient_store)
                                 if not success:
                                     print(f"Không thể gửi Gradients {i} tới Gradient_queue.")
