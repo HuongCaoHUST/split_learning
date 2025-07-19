@@ -146,7 +146,7 @@ class Server:
                 self.best_model_2 = best
                 print("BEST_2.pt:", self.best_model_2)
                 merge_model = self.merge_yolo_models()
-                args = dict(model=merge_model, data=self.dataset_path)
+                args = dict(model=merge_model, data=self.dataset_path[0])
                 validator = DetectionValidator(args=args)
                 validator()
                 sys.exit()
@@ -157,13 +157,26 @@ class Server:
     def notify_to_clients(self, start=True, register=True):
 
         src.Log.print_with_color(f"notify_client", "red")
+        print("self.list_client: ", self.list_clients)
+        layer1_clients = [(client_id, layer_id) for client_id, layer_id in self.list_clients if layer_id == 1]
+
+        print("layer1_client: ", layer1_clients)
+
+        dataset_index = 0
         for (client_id, layer_id) in self.list_clients:
+            
+            if layer_id == 1:
+                dataset_path = self.dataset_path[dataset_index]
+                dataset_index += 1
+            else:
+                dataset_path = self.dataset_path[0]
+
             if start:
                 response = {"action": "START",
                             "message": "Server accept the connection!",
                             "num_client": self.total_clients,
                             "model_path": self.model_path,
-                            "dataset_path": self.dataset_path,
+                            "dataset_path": dataset_path,
                             "cut_layer": self.cut_layer,
                             "control_count": self.control_count,
                             "epochs": self.epochs,
