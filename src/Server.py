@@ -79,7 +79,7 @@ class Server:
         self.cut_layer = config["model"]["cut_layer"]
         self.output_model = config["model"]["output_model"]
 
-        self.best_model_1 = None
+        self.best_model_layer_1 = []
         self.best_model_2 = None
 
         #Dataset
@@ -140,12 +140,11 @@ class Server:
             client_id = message["client_id"]
             src.Log.print_with_color(f"[<<<] Received best model from client: {best}", "blue")
             if layer_id == 1:
-                self.best_model_1 = best
-                print("BEST_1.pt:", self.best_model_1)
+                self.best_model_layer_1.append(best)
+                print("BEST_layer_1.pt:", best)
             if layer_id == 2:
                 self.best_model_2 = best
                 print("BEST_2.pt:", self.best_model_2)
-
                 merge_model = self.merge_yolo_models()
                 args = dict(model=merge_model, data=self.dataset_path)
                 validator = DetectionValidator(args=args)
@@ -193,27 +192,58 @@ class Server:
         )
     
     def merge_yolo_models(self):
-        model1 = YOLO(self.best_model_1)
-        model2 = YOLO(self.best_model_2)
-        output_path = self.output_model
+        if self.total_clients[0] == 1:
+            model1 = YOLO(self.best_model_layer_1[0])
+            model2 = YOLO(self.best_model_2)
+            output_path = self.output_model
 
-        state_dict1 = model1.model.state_dict()
-        state_dict2 = model2.model.state_dict()
+            state_dict1 = model1.model.state_dict()
+            state_dict2 = model2.model.state_dict()
 
-        new_state_dict = state_dict2.copy()
+            new_state_dict = state_dict2.copy()
 
-        for k in state_dict1.keys():
-            if k.startswith("model."):
-                try:
-                    layer_num = int(k.split('.')[1])
-                    if layer_num <= self.cut_layer:
-                        new_state_dict[k] = state_dict1[k]
-                except:
-                    pass
+            for k in state_dict1.keys():
+                if k.startswith("model."):
+                    try:
+                        layer_num = int(k.split('.')[1])
+                        if layer_num <= self.cut_layer:
+                            new_state_dict[k] = state_dict1[k]
+                    except:
+                        pass
 
-        model2.model.load_state_dict(new_state_dict)
+            model2.model.load_state_dict(new_state_dict)
 
-        model2.save(output_path)
+            model2.save(output_path)
 
-        print(f"Đã ghép xong model và lưu tại: {output_path}")
-        return output_path
+            print(f"Đã ghép xong model và lưu tại: {output_path}")
+            return output_path
+        else:
+            state_dicts = []
+            output_path = self.output_model
+            for model_path in self.best_model_layer_1:
+                model = YOLO(model_path)
+                state_dicts.append(model.model.state_dict())
+            
+            # Average weights
+            avg_state_dict = {}
+            for key in state_dicts[0].keys():
+                if key.startswith("model."):
+                    try:
+                        layer_num = int(key.split('.')[1])
+                        if layer_num <= self.cut_layer:
+                            weights = [sd[key] for sd in state_dicts]
+                            avg_weight = sum(weights) / len(weights)
+                            avg_state_dict[key] = avg_weight
+                    except:
+                        pass
+
+            model2 = YOLO(self.best_model_2)
+            state_dict2 = model2.model.state_dict()
+            new_state_dict = state_dict2.copy()
+            new_state_dict.update(avg_state_dict)
+
+            model2.model.load_state_dict(new_state_dict)
+            model2.save(output_path)
+
+            print(f"Đã ghép xong model và lưu tại: {output_path}")
+            return output_path

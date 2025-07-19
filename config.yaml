@@ -2,7 +2,7 @@ name: Split Learning
 server:
   num-round: 1
   clients:
-    - 2
+    - 1
     - 1
   model: YOLO11n
   parameters:
@@ -21,7 +21,7 @@ model:
   output_model: ./merged_model.pt
 
 dataset:
-  dataset_path: ./datasets/coco128.yaml
+  dataset_path: ./datasets/livingroom_2.yaml
 
 log_path: .
 
