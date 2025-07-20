@@ -16,9 +16,6 @@ import src.Log
 import src.Utils
 import src.Validation
 
-num_labels = 10
-
-
 def delete_old_queues(address, username, password):
     url = f'http://{address}:15672/api/queues'
     response = requests.get(url, auth=HTTPBasicAuth(username, password))
@@ -78,7 +75,6 @@ class Server:
         self.model_path = config["model"]["model_path"]
         self.cut_layer = config["model"]["cut_layer"]
         self.output_model = config["model"]["output_model"]
-
         self.best_model_layer_1 = []
         self.best_model_2 = None
 
@@ -183,11 +179,7 @@ class Server:
                             "batch_size": self.batch_size,
                             "lr": self.lr,
                             "momentum": self.momentum}
-            # else:
-            #     src.Log.print_with_color(f"[>>>] Sent stop training request to client {client_id}", "red")
-            #     response = {"action": "STOP",
-            #                 "message": "Stop training!",
-            #                 "parameters": None}
+
             self.time_start = time.time_ns()
             src.Log.print_with_color(f"[>>>] Sent start training request to client {client_id}", "red")
             self.send_to_client(client_id, pickle.dumps(response))
