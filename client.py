@@ -22,7 +22,7 @@ with open('config.yaml', 'r') as file:
 
 
 client_id = uuid.uuid4()
-address = config["rabbit"]["address"]
+address = "127.0.0.1"
 username = config["rabbit"]["username"]
 password = config["rabbit"]["password"]
 

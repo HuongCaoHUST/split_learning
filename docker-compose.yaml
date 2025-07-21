@@ -13,6 +13,37 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
       - ./rabbitmq_config/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+
+  server:
+    image: split_learning-split_learning_app
+    container_name: split_learning_server
+    depends_on:
+      - rabbitmq
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: ["python", "server.py"]
+
+  # client1:
+  #   image: split_learning-split_learning_app
+  #   container_name: split_learning_client1
+  #   depends_on:
+  #     - rabbitmq
+  #   volumes:
+  #     - .:/app
+  #   working_dir: /app
+  #   command: ["python", "client.py", "--layer_id", "1"]
+
+  # client2:
+  #   image: split_learning-split_learning_app
+  #   container_name: split_learning_client2
+  #   depends_on:
+  #     - rabbitmq
+  #   volumes:
+  #     - .:/app
+  #   working_dir: /app
+  #   command: ["python", "client.py", "--layer_id", "2"]
+    
 volumes:
   rabbitmq_data:
     driver: local
