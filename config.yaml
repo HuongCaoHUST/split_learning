@@ -11,7 +11,7 @@ server:
   validation: True
 
 rabbit:
-  address: 127.0.0.1
+  address: 172.18.0.2
   username: user
   password: password
 
@@ -22,7 +22,7 @@ model:
 
 dataset:
   dataset_path:
-    - ./datasets/livingroom_2_1.yaml
+    - ./datasets/livingroom_2.yaml
     - ./datasets/livingroom_2_2.yaml
 
 log_path: .

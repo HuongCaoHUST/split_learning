@@ -55,10 +55,10 @@ class Server:
         with open(config_dir, 'r') as file:
             config = yaml.safe_load(file)
 
-        address = config["rabbit"]["address"]
-        username = config["rabbit"]["username"]
-        password = config["rabbit"]["password"]
-        delete_old_queues(address, username, password)
+        self.address = config["rabbit"]["address"]
+        self.username = config["rabbit"]["username"]
+        self.password = config["rabbit"]["password"]
+        delete_old_queues(self.address, self.username, self.password)
 
         # Clients
         self.total_clients = config["server"]["clients"]
@@ -83,23 +83,37 @@ class Server:
 
         log_path = config["log_path"]
 
-        credentials = pika.PlainCredentials(username, password)
-        self.connection = pika.BlockingConnection(pika.ConnectionParameters(address, 5672, '/', credentials))
-        self.channel = self.connection.channel()
+        # credentials = pika.PlainCredentials(username, password)
+        # self.connection = pika.BlockingConnection(pika.ConnectionParameters(address, 5672, '/', credentials))
+        # self.channel = self.connection.channel()
+
+        self.connect()
 
         self.channel.queue_declare(queue='Server_queue')
         self.channel.basic_qos(prefetch_count=1)
         self.channel.basic_consume(queue='Server_queue', on_message_callback=self.on_request)
         self.logger = src.Log.Logger(f"{log_path}/app.log")
-        self.logger.log_info("Application start")
+        self.logger.log_info("   start")
 
         src.Log.print_with_color(f"Server is waiting for {self.total_clients} clients.", "green")
+
+    def connect(self):
+        credentials = pika.PlainCredentials(self.username, self.password)
+        while True:
+            try:
+                self.connection = pika.BlockingConnection(pika.ConnectionParameters(self.address, 5672, '/', credentials))
+                self.channel = self.connection.channel()
+                break
+            except pika.exceptions.AMQPConnectionError:
+                print("⏳ Waiting for RabbitMQ to be ready...")
+                time.sleep(2)
 
     def start(self):
         self.channel.start_consuming()
 
     def on_request(self, ch, method, props, body):
         message = pickle.loads(body)
+        
         routing_key = props.reply_to
         action = message["action"]
         client_id = message["client_id"]
@@ -142,7 +156,7 @@ class Server:
                 self.best_model_2 = best
                 print("BEST_2.pt:", self.best_model_2)
                 merge_model = self.merge_yolo_models()
-                args = dict(model=merge_model, data=self.dataset_path[0])
+                args = dict(model=merge_model, data="/app/datasets/livingroom_2_1_for_docker.yaml")
                 validator = DetectionValidator(args=args)
                 validator()
                 sys.exit()

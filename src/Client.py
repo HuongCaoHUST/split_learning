@@ -66,6 +66,8 @@ class Client:
             if self.layer_id == 2:
                 result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, epochs, batch_size, self.address, self.username, self.password)
             
+            best = str(best).replace("F:\\Do_an\\split_learning", "/app").replace("\\", "/")
+            
             data = {"action": "UPDATE", "client_id": self.client_id, "layer_id": self.layer_id,
                     "result": result, "message": "Sent parameters to Server", "best": best}
             
