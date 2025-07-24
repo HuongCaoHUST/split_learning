@@ -161,7 +161,6 @@ class BaseTrainer:
         self.username = self.args.username
         self.password = self.args.password
         self.channel= self.connect_rabbitmq()
-        print("Self.channel in trainer: ", self.channel)
         
         # Cut_layer
         self.cut_layer = self.args.cut_layer    
@@ -202,27 +201,18 @@ class BaseTrainer:
 
 
     def connect_rabbitmq(self):
-        """
-        Thiết lập kết nối tới RabbitMQ và trả về kênh (channel) để sử dụng.
-        """
         try:
-            # Tạo thông tin xác thực
             credentials = pika.PlainCredentials(self.username, self.password)
-            # Tạo tham số kết nối
             parameters = pika.ConnectionParameters(
                 host=self.address,
                 port=5672,
                 virtual_host='/',
                 credentials=credentials
             )
-            # Thiết lập kết nối
             connection = pika.BlockingConnection(parameters)
-            # Tạo kênh
             channel = connection.channel()
-            print("Kết nối tới RabbitMQ thành công!")
             return channel
         except Exception as e:
-            print(f"Lỗi kết nối tới RabbitMQ: {e}")
             return None
 
     def add_callback(self, event: str, callback):
@@ -433,7 +423,8 @@ class BaseTrainer:
                 f"Logging results to {colorstr('bold', self.save_dir)}\n"
                 f"Starting training for " + (f"{self.args.time} hours..." if self.args.time else f"{self.epochs} epochs...")
             )
-        # Đặt cờ is_training thành True trước khi huấn luyện
+
+        # Set training flag
         if hasattr(self.model, 'module') and hasattr(self.model.module, 'is_training'):
             self.model.module.is_training = True
         elif hasattr(self.model, 'is_training'):
@@ -448,6 +439,7 @@ class BaseTrainer:
         epoch = self.start_epoch
         self.optimizer.zero_grad()  # zero any resumed gradients to ensure stability on train start
         if self.layer_id == 1:
+            LOGGER.info(f"START TRAINING IN CLIENT 1")
             while True:
                 self.epoch = epoch
                 self.run_callbacks("on_train_epoch_start")
@@ -573,6 +565,7 @@ class BaseTrainer:
                 epoch += 1
         else:
             print("CLIENT 2 HELLO WORLD!!!")
+            LOGGER.info(f"START TRAINING IN CLIENT 2")
             while True:
                 self.epoch = epoch
                 self.run_callbacks("on_train_epoch_start")

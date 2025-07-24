@@ -17,7 +17,7 @@ rabbit:
 
 model:
   model_path: ./yolo11n.pt
-  cut_layer: 1
+  cut_layer: 10
   output_model: ./merged_model.pt
 
 dataset:
@@ -29,7 +29,7 @@ log_path: .
 
 learning:
   learning-rate: 0.0001
-  epochs: 5
+  epochs: 20
   momentum: 0.5
   batch-size: 16
   control-count: 3
