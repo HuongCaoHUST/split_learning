@@ -38,15 +38,16 @@ class Client:
         return self.response
     
     def wait_response(self):
-        status = True
         reply_queue_name = f'reply_{self.client_id}'
         self.channel.queue_declare(reply_queue_name, durable=False)
-        while status:
+
+        while True:
             method_frame, header_frame, body = self.channel.basic_get(queue=reply_queue_name, auto_ack=True)
             if body:
-                status = self.response_message(body)
-                break
-            time.sleep(0.5)
+                success = self.response_message(body)
+                if success:
+                    break
+            time.sleep(5)
 
     def response_message(self, body):
         self.response = pickle.loads(body)
