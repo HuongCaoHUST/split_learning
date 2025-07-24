@@ -29,7 +29,7 @@ log_path: .
 
 learning:
   learning-rate: 0.0001
-  epochs: 1
+  epochs: 5
   momentum: 0.5
   batch-size: 16
   control-count: 3

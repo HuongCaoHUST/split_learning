@@ -27,7 +27,6 @@ class Client:
         credentials = pika.PlainCredentials(self.username, self.password)
         self.connection = pika.BlockingConnection(pika.ConnectionParameters(self.address, 5672, '/', credentials))
         self.channel = self.connection.channel()
-        
 
     def send_to_server(self, message):
         self.connect()

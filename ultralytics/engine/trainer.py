@@ -586,11 +586,6 @@ class BaseTrainer:
 
                 fake_batches = [None] * nb
                 pbar = enumerate(fake_batches)
-                # # Update dataloader attributes (optional)
-                # if self.layer_id != 2 or self.layer_id != 1:
-                #     if epoch == (self.epochs - self.args.close_mosaic):
-                #         self._close_dataloader_mosaic()
-                #         self.train_loader.reset()
 
                 if RANK in {-1, 0}:
                     LOGGER.info(self.progress_string())
@@ -649,7 +644,6 @@ class BaseTrainer:
                                     print(f"Gradient shape của tensor {tensor_id} (data_store): {tensor.grad.shape}")
                                 else:
                                     print(f"Gradient của tensor {tensor_id} (data_store) là None")
-                    print("Chạy tới BACKWARD")
 
                     # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
                     if ni - last_opt_step >= self.accumulate:
@@ -665,8 +659,7 @@ class BaseTrainer:
                                 self.stop = broadcast_list[0]
                             if self.stop:  # training time exceeded
                                 break
-                    print("Chạy tới trước LOG")
-                    
+
                     # Log
                     if RANK in {-1, 0}:
                         loss_length = self.tloss.shape[0] if len(self.tloss.shape) else 1

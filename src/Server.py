@@ -18,7 +18,6 @@ import src.Validation
 
 def delete_old_queues(address, username, password):
     url = f'http://{address}:15672/api/queues'
-    response = requests.get(url, auth=HTTPBasicAuth(username, password))
 
     while True:
         try:

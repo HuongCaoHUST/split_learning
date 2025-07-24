@@ -4,7 +4,7 @@ import argparse
 import yaml
 
 import torch
-
+import time
 import src.Log
 from src.Client import Client
 from src.Trainning import Trainning
@@ -43,14 +43,22 @@ else:
     device = args.device
     print(f"Using device: {device}")
 
-credentials = pika.PlainCredentials(username, password)
-connection = pika.BlockingConnection(pika.ConnectionParameters(address, 5672, '/', credentials))
-channel = connection.channel()
-
+def connection(username, password, address):
+    credentials = pika.PlainCredentials(username, password)
+    while True:
+        try:
+            connection = pika.BlockingConnection(
+                pika.ConnectionParameters(address, 5672, '/', credentials)
+            )
+            return connection
+        except pika.exceptions.AMQPConnectionError as e:
+            time.sleep(1)
 
 if __name__ == "__main__":
     src.Log.print_with_color("[>>>] Client sending registration message to server...", "red")
     data = {"action": "REGISTER", "client_id": client_id, "layer_id": args.layer_id, "message": "Hello from Client!"}
+    connection = connection(username, password, address)
+    channel = connection.channel()
     trainning = Trainning(client_id, args.layer_id, channel, device, args.event_time)
     client = Client(client_id, args.layer_id, address, username, password, trainning.train_on_device, device)
     client.send_to_server(data)
