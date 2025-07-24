@@ -38,6 +38,7 @@ class Client:
         return self.response
     
     def wait_response(self):
+        self.connect()
         reply_queue_name = f'reply_{self.client_id}'
         self.channel.queue_declare(reply_queue_name, durable=False)
 
