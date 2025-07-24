@@ -20,6 +20,17 @@ def delete_old_queues(address, username, password):
     url = f'http://{address}:15672/api/queues'
     response = requests.get(url, auth=HTTPBasicAuth(username, password))
 
+    while True:
+        try:
+            response = requests.get(url, auth=HTTPBasicAuth(username, password))
+            if response.status_code == 200:
+                break
+            else:
+                src.Log.print_with_color(f"⚠️ Waiting for RabbitMQ API... Status: {response.status_code}", "yellow")
+        except requests.exceptions.ConnectionError:
+            src.Log.print_with_color("⏳ Waiting for RabbitMQ HTTP API to be ready...", "yellow")
+        time.sleep(1)
+
     if response.status_code == 200:
         queues = response.json()
 
@@ -106,8 +117,8 @@ class Server:
                 break
             except pika.exceptions.AMQPConnectionError:
                 print("⏳ Waiting for RabbitMQ to be ready...")
-                time.sleep(2)
-
+                time.sleep(1)
+    
     def start(self):
         self.channel.start_consuming()
 
@@ -180,6 +191,9 @@ class Server:
                 dataset_index += 1
             else:
                 dataset_path = self.dataset_path[0]
+            
+            if layer_id == 2:
+                dataset_path = "/app/datasets/livingroom_2_1_for_docker.yaml"
 
             if start:
                 response = {"action": "START",

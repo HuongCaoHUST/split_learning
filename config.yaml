@@ -23,7 +23,7 @@ model:
 dataset:
   dataset_path:
     - ./datasets/livingroom_2.yaml
-    - ./datasets/livingroom_2_2.yaml
+    - ./datasets/livingroom_2_for.yaml
 
 log_path: .
 

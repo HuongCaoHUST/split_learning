@@ -25,6 +25,17 @@ services:
       - .:/app
     working_dir: /app
     command: ["python", "server.py"]
+
+  client:
+    container_name: split_learning_client_2
+    image: split_learning-server
+    depends_on:
+      - rabbitmq
+      - server
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: ["python", "client.py", "--layer_id", "2"]
     
 volumes:
   rabbitmq_data:

@@ -22,7 +22,10 @@ with open('config.yaml', 'r') as file:
 
 
 client_id = uuid.uuid4()
-address = "127.0.0.1"
+if args.layer_id == 2:
+    address = "172.18.0.2"
+else:
+    address = "127.0.0.1"
 username = config["rabbit"]["username"]
 password = config["rabbit"]["password"]
 
