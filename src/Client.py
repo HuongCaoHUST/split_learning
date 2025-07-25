@@ -49,6 +49,10 @@ class Client:
                 if success:
                     break
             time.sleep(5)
+    
+    def read_file(self, file_path):
+        with open(file_path, "rb") as file:
+            return file.read()
 
     def response_message(self, body):
         self.response = pickle.loads(body)
@@ -64,14 +68,15 @@ class Client:
             src.Log.print_with_color(f"[<<<] Client received: {self.response}", "blue")
             if self.layer_id == 1:
                 result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, epochs, batch_size, self.address, self.username, self.password)
+                file_data = self.read_file(best)
 
             if self.layer_id == 2:
                 result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, epochs, batch_size, self.address, self.username, self.password)
             
-            best = str(best).replace("F:\\Do_an\\split_learning", "/app").replace("\\", "/")
+            # best = str(best).replace("F:\\Do_an\\split_learning", "/app").replace("\\", "/")
             
             data = {"action": "UPDATE", "client_id": self.client_id, "layer_id": self.layer_id,
-                    "result": result, "message": "Sent parameters to Server", "best": best}
+                    "result": result, "message": "Sent parameters to Server", "best": file_data}
             
             src.Log.print_with_color("[>>>] Client sent parameters to server", "red")
             self.send_to_server(data)

@@ -25,7 +25,7 @@ client_id = uuid.uuid4()
 if args.layer_id == 2:
     address = "172.18.0.2"
 else:
-    address = "192.168.75.155"
+    address = "192.168.75.157"
 username = config["rabbit"]["username"]
 password = config["rabbit"]["password"]
 
