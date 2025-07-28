@@ -80,7 +80,7 @@ class Trainning:
                     num_client=num_client,
                     epochs=epochs,
                     batch=batch_size,
-                    optimizer='AdamW',
+                    # optimizer='AdamW',
                     client_id=self.client_id,
                     close_mosaic = 5,
                     layer_id=self.layer_id,

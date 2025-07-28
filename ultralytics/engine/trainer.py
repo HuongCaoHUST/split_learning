@@ -23,6 +23,7 @@ from torch import nn, optim
 import pika
 import pickle
 import uuid
+import pandas as pd
 import json
 import tqdm
 import threading
@@ -184,6 +185,9 @@ class BaseTrainer:
         self.loss_names = ["Loss"]
         self.csv = self.save_dir / "results.csv"
         self.plot_idx = [0, 1, 2]
+
+        if self.layer_id == 1:
+            self.init_csv('log_time.csv', ['epoch', 'forward_and_backward', 'training_time'])
 
         # HUB
         self.hub_session = None
@@ -485,10 +489,14 @@ class BaseTrainer:
                                 x["momentum"] = np.interp(ni, xi, [self.args.warmup_momentum, self.args.momentum])
                     # Forward
                     with autocast(self.amp):
+                        start_batch_time = time.time()
                         batch = self.preprocess_batch(batch)
                         if self.layer_id == 1:
                             data_id = uuid.uuid4()
                             success = self.send_label(data_id, batch)
+                            end_batch_time = time.time()
+                            duration = round(end_batch_time - start_batch_time, 2)
+                            print("Duration: ", duration)
                             if not success:
                                 print(f"Không thể gửi batch {i} tới label_queue.")
                         preds = self.model(batch["img"])
@@ -739,7 +747,7 @@ class BaseTrainer:
     def send_label(self, data_id, labels):
         queue_name = f'label_queue'
         self.channel.queue_declare(queue_name, durable=False)
-
+        # print("Label IDX: ", labels['cls'])
         message = pickle.dumps(
             {"data_id": data_id,
             "label": labels}
@@ -964,6 +972,20 @@ class BaseTrainer:
             return [16, 19, cut_layer]
         elif cut_layer == 22:
             return [16, 19, cut_layer]
+
+    def init_csv(self, csv_file, headers):
+        """
+        Init csv log file
+        """
+        df = pd.DataFrame(columns=headers)
+        df.to_csv(csv_file, index=False)
+    
+    def log_to_csv(csv_file, data_dict):
+        """
+        Log to csv file
+        """
+        df = pd.DataFrame([data_dict])
+        df.to_csv(csv_file, mode='a', header=not os.path.exists(csv_file), index=False)
 
     def auto_batch(self, max_num_obj=0):
         """Calculate optimal batch size based on model and device memory constraints."""

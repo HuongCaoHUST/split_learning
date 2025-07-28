@@ -188,7 +188,7 @@ class Server:
                 dataset_path = self.dataset_path[0]
             
             if layer_id == 2:
-                dataset_path = "/app/datasets/livingroom_2_1_for_docker.yaml"
+                dataset_path = "/app/datasets/livingroom_concat_docker.yaml"
 
             if start:
                 response = {"action": "START",

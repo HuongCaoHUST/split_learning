@@ -306,6 +306,9 @@ class YOLODataset(BaseDataset):
                 value = torch.nn.utils.rnn.pad_sequence(value, batch_first=True)
             if k in {"masks", "keypoints", "bboxes", "cls", "segments", "obb"}:
                 value = torch.cat(value, 0)
+                # # Config here
+                # if k == "cls":
+                #     value = value + 20
             new_batch[k] = value
         new_batch["batch_idx"] = list(new_batch["batch_idx"])
         for i in range(len(new_batch["batch_idx"])):
