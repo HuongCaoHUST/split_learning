@@ -26,7 +26,7 @@ services:
     working_dir: /app
     command: ["python", "server.py"]
 
-  client:
+  client_2:
     container_name: split_learning_client_2
     image: split_learning-server
     depends_on:

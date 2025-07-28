@@ -70,6 +70,7 @@ class Trainning:
         queue_name = f'label_queue'
         result = True
         self.channel.queue_declare(queue=queue_name, durable=False)
+        self.channel.queue_declare(queue="number_batch_queue", durable=False)
         self.channel.basic_qos(prefetch_count=10)
         print('Waiting for intermediate output. To exit press CTRL+C')
 
@@ -79,7 +80,9 @@ class Trainning:
                     num_client=num_client,
                     epochs=epochs,
                     batch=batch_size,
+                    optimizer='AdamW',
                     client_id=self.client_id,
+                    close_mosaic = 5,
                     layer_id=self.layer_id,
                     cut_layer=cut_layer,
                     address=address,

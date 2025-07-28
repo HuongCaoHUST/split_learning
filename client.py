@@ -13,6 +13,7 @@ from src.Trainning import Trainning
 parser = argparse.ArgumentParser(description="Split learning framework")
 parser.add_argument('--layer_id', type=int, required=True, help='ID of layer, start from 1')
 parser.add_argument('--device', type=str, required=False, help='Device of client')
+parser.add_argument('--docker', action='store_true', help='Run inside Docker container')
 parser.add_argument('--event_time', type=bool, default=False, required=False, help='Log event time for debug mode')
 
 args = parser.parse_args()
@@ -24,11 +25,14 @@ with open('config.yaml', 'r') as file:
 client_id = uuid.uuid4()
 if args.layer_id == 2:
     address = "172.18.0.2"
+elif args.layer_id == 1 and args.docker == True :
+    address = "172.18.0.2"
 else:
-    address = "192.168.75.155"
+    address = "127.0.0.1"
 username = config["rabbit"]["username"]
 password = config["rabbit"]["password"]
 
+print("ARGS.Docker: ", args.docker)
 
 device = None
 
@@ -56,7 +60,7 @@ def connection(username, password, address):
 
 if __name__ == "__main__":
     src.Log.print_with_color("[>>>] Client sending registration message to server...", "red")
-    data = {"action": "REGISTER", "client_id": client_id, "layer_id": args.layer_id, "message": "Hello from Client!"}
+    data = {"action": "REGISTER", "client_id": client_id, "layer_id": args.layer_id, "docker": args.docker, "message": "Hello from Client!"}
     connection = connection(username, password, address)
     channel = connection.channel()
     trainning = Trainning(client_id, args.layer_id, channel, device, args.event_time)

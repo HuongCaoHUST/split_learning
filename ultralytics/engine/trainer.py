@@ -755,7 +755,7 @@ class BaseTrainer:
         return True
     
     def send_number_batch_client_id(self, nb = None, client_id = None):
-        queue_name = f'label_queue'
+        queue_name = f'number_batch_queue'
         self.channel.queue_declare(queue_name, durable=False)
 
         message = pickle.dumps(
@@ -776,10 +776,11 @@ class BaseTrainer:
         total_nb = 0
         received = 0
         while received < expected_messages:
-            queue_name = f'label_queue'
+            queue_name = f'number_batch_queue'
             method_frame, header_frame, body = self.channel.basic_get(queue=queue_name, auto_ack=True)
             if method_frame and body:
                 received_data = pickle.loads(body)
+                print("Received data:", received_data)
                 nb = received_data["nb"]
                 client_id = received_data["client_id"]
                 if nb is not None and client_id is not None:
@@ -788,6 +789,7 @@ class BaseTrainer:
                     received += 1
             else:
                 time.sleep(1)
+        self.channel.queue_delete(queue=queue_name)
         return total_nb
     
     def wait_for_batch(self):

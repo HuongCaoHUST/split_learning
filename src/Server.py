@@ -93,17 +93,13 @@ class Server:
 
         log_path = config["log_path"]
 
-        # credentials = pika.PlainCredentials(username, password)
-        # self.connection = pika.BlockingConnection(pika.ConnectionParameters(address, 5672, '/', credentials))
-        # self.channel = self.connection.channel()
-
         self.connect()
 
         self.channel.queue_declare(queue='Server_queue')
         self.channel.basic_qos(prefetch_count=1)
         self.channel.basic_consume(queue='Server_queue', on_message_callback=self.on_request)
         self.logger = src.Log.Logger(f"{log_path}/app.log")
-        self.logger.log_info("   start")
+        self.logger.log_info("Start Training")
 
         src.Log.print_with_color(f"Server is waiting for {self.total_clients} clients.", "green")
 
@@ -135,7 +131,7 @@ class Server:
         if action == "REGISTER":
             src.Log.print_with_color(f"[<<<] Received message from client: {message}", "blue")
             self.register_clients[layer_id - 1] += 1
-
+            docker = message["docker"]
             if self.register_clients == self.total_clients:
                 src.Log.print_with_color("All clients are connected. Sending notifications.", "green")
                 self.notify_to_clients()

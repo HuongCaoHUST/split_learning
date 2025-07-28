@@ -178,7 +178,7 @@ class BaseModel(torch.nn.Module):
         data_store = {}
         start_layer = self.cut_layer + 1
         start_idx = start_layer if self.is_training and self.layer_id == 2 else 0
-        max_retries = 200
+        max_retries = 1000
         retry_delay = 1
 
         if self.is_training and self.layer_id == 2:
