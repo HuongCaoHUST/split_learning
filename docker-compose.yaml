@@ -13,6 +13,12 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
       - ./rabbitmq_config/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   server:
     container_name: split_learning_server
@@ -20,7 +26,9 @@ services:
       context: . 
       dockerfile: Dockerfile
     depends_on:
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
+        
     volumes:
       - .:/app
     working_dir: /app
@@ -30,8 +38,10 @@ services:
     container_name: split_learning_client_2
     image: split_learning-server
     depends_on:
-      - rabbitmq
-      - server
+      rabbitmq:
+        condition: service_healthy
+      server:
+        condition: service_started
     volumes:
       - .:/app
     working_dir: /app

@@ -9,6 +9,7 @@ import torch
 import torch.nn as nn
 import requests
 from ultralytics.models.yolo.detect import DetectionValidator
+from ultralytics.data.utils import check_det_dataset
 from requests.auth import HTTPBasicAuth
 from ultralytics import YOLO
 import src.Model
@@ -75,7 +76,6 @@ class Server:
         self.batch_size = config["learning"]["batch-size"]
         self.lr = config["learning"]["learning-rate"]
         self.momentum = config["learning"]["momentum"]
-        self.control_count = config["learning"]["control-count"]
         self.epochs = config["learning"]["epochs"]
 
         self.register_clients = [0 for _ in range(len(self.total_clients))]
@@ -90,6 +90,20 @@ class Server:
 
         #Dataset
         self.dataset_path = config["dataset"]["dataset_path"]
+        self.concatenate_datasets = config["dataset"]["concatenate_datasets"]
+        if self.concatenate_datasets == True and self.total_clients[0] >1:
+            self.nc_list_cumulative = []
+            cumulative = 0
+            for i, path in enumerate(self.dataset_path):
+                if i == self.total_clients[0]:
+                    break
+                result = check_det_dataset(path)
+                nc = result['nc']
+                print(f"SỐ LƯỢNG CLASS (NC): {nc}")
+                cumulative += nc
+                self.nc_list_cumulative.append(cumulative)
+
+            print ("CUMULATIVE: ", self.nc_list_cumulative)
 
         log_path = config["log_path"]
 
@@ -180,28 +194,26 @@ class Server:
 
         dataset_index = 0
         for (client_id, layer_id) in self.list_clients:
-            
-            if layer_id == 1:
-                dataset_path = self.dataset_path[dataset_index]
-                dataset_index += 1
-            else:
-                dataset_path = self.dataset_path[0]
-            
-            if layer_id == 2:
-                dataset_path = "/app/datasets/livingroom_concat_docker.yaml"
-
             if start:
                 response = {"action": "START",
                             "message": "Server accept the connection!",
                             "num_client": self.total_clients,
                             "model_path": self.model_path,
-                            "dataset_path": dataset_path,
                             "cut_layer": self.cut_layer,
-                            "control_count": self.control_count,
                             "epochs": self.epochs,
                             "batch_size": self.batch_size,
                             "lr": self.lr,
                             "momentum": self.momentum}
+                
+                if layer_id == 1:
+                    response["dataset_path"] = self.dataset_path[dataset_index]
+                    if self.concatenate_datasets and dataset_index !=0:
+                        delta_nc = self.nc_list_cumulative[dataset_index - 1]
+                        response["concatenate_datasets"] = True
+                        response["delta_nc"] = delta_nc
+                    dataset_index += 1
+                elif layer_id == 2:
+                    response["dataset_path"] = "/app/datasets/livingroom_concat.yaml"
 
             self.time_start = time.time_ns()
             src.Log.print_with_color(f"[>>>] Sent start training request to client {client_id}", "red")
