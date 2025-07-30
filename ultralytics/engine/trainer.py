@@ -165,7 +165,11 @@ class BaseTrainer:
         
         # Cut_layer
         self.cut_layer = self.args.cut_layer    
-        self.tensor_send_ids = self.get_tensor_send_id(self.cut_layer)
+        if self.layer_id == 1:
+            self.tensor_send_ids = self.get_tensor_send_id(self.cut_layer)
+        elif self.layer_id == 2:
+            self.cut_layer_ids = []
+            self.tensor_send_ids = []
         # Model and Dataset
         self.model = check_model_file_from_stem(self.args.model)  # add suffix, i.e. yolo11n -> yolo11n.pt
         with torch_distributed_zero_first(LOCAL_RANK):  # avoid auto-downloading dataset multiple times
@@ -408,6 +412,12 @@ class BaseTrainer:
             nw = max(round(self.args.warmup_epochs * nb), 100) if self.args.warmup_epochs > 0 else -1  # warmup iterations
         else:
             nb = self.wait_for_number_batch_client_id()
+            print("Self.tensor_send_ids: ", self.tensor_send_ids)
+            print("Seld.client_ids: ", self.client_ids)
+            print("Seld.cut_layer_ids: ", self.cut_layer_ids)
+            self.model.client_ids = self.client_ids
+            self.model.cut_layer_ids = self.cut_layer_ids
+            self.model.tensor_send_ids = self.tensor_send_ids
             nw = 1
         last_opt_step = -1
         self.epoch_time = None
@@ -467,7 +477,7 @@ class BaseTrainer:
 
                 # Send number_batch to RabbitMQ
                 if epoch == 0:
-                    success = self.send_number_batch_client_id(nb, self.client_id)
+                    success = self.send_number_batch_client_id(nb, self.client_id, self.cut_layer, self.tensor_send_ids)
                     if not success:
                         print(f"Không thể gửi number_batch tới queue.")
                 if self.model.is_training == True:
@@ -762,13 +772,15 @@ class BaseTrainer:
         print(f"Batch {data_id} đã được gửi tới {queue_name}, Kích thước: {len(message)} bytes")
         return True
     
-    def send_number_batch_client_id(self, nb = None, client_id = None):
+    def send_number_batch_client_id(self, nb = None, client_id = None, client_cut_layer = None, tensor_send_ids = None):
         queue_name = f'number_batch_queue'
         self.channel.queue_declare(queue_name, durable=False)
 
         message = pickle.dumps(
             {"nb": nb,
-             "client_id": client_id}
+             "client_id": client_id,
+             "client_cut_layer": client_cut_layer,
+             "tensor_send_ids": tensor_send_ids}
         )
 
         self.channel.basic_publish(
@@ -791,12 +803,16 @@ class BaseTrainer:
                 print("Received data:", received_data)
                 nb = received_data["nb"]
                 client_id = received_data["client_id"]
+                client_cut_layer = received_data["client_cut_layer"]
+                tensor_send_ids = received_data["tensor_send_ids"]
                 if nb is not None and client_id is not None:
                     total_nb += nb
                     self.client_ids.append(client_id) 
+                    self.cut_layer_ids.append(client_cut_layer) 
+                    self.tensor_send_ids.append(tensor_send_ids) 
                     received += 1
             else:
-                time.sleep(1)
+                time.sleep(0.5)
         self.channel.queue_delete(queue=queue_name)
         return total_nb
     

@@ -32,8 +32,6 @@ else:
 username = config["rabbit"]["username"]
 password = config["rabbit"]["password"]
 
-print("ARGS.Docker: ", args.docker)
-
 device = None
 
 if args.device is None:

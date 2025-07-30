@@ -176,7 +176,7 @@ class Server:
                 self.best_model_2 = best
                 print("BEST_2.pt:", self.best_model_2)
                 merge_model = self.merge_yolo_models()
-                args = dict(model=merge_model, data="/app/datasets/livingroom_2_1_for_docker.yaml")
+                args = dict(model=merge_model, data="/app/datasets/livingroom_2_1.yaml")
                 validator = DetectionValidator(args=args)
                 validator()
                 sys.exit()
@@ -199,13 +199,13 @@ class Server:
                             "message": "Server accept the connection!",
                             "num_client": self.total_clients,
                             "model_path": self.model_path,
-                            "cut_layer": self.cut_layer,
                             "epochs": self.epochs,
                             "batch_size": self.batch_size,
                             "lr": self.lr,
                             "momentum": self.momentum}
                 
                 if layer_id == 1:
+                    response["cut_layer"] = self.cut_layer[dataset_index]
                     response["dataset_path"] = self.dataset_path[dataset_index]
                     if self.concatenate_datasets and dataset_index !=0:
                         delta_nc = self.nc_list_cumulative[dataset_index - 1]
@@ -213,7 +213,8 @@ class Server:
                         response["delta_nc"] = delta_nc
                     dataset_index += 1
                 elif layer_id == 2:
-                    response["dataset_path"] = "/app/datasets/livingroom_concat.yaml"
+                    response["cut_layer"] = self.cut_layer
+                    response["dataset_path"] = "/app/datasets/livingroom_3_1.yaml"
 
             self.time_start = time.time_ns()
             src.Log.print_with_color(f"[>>>] Sent start training request to client {client_id}", "red")

@@ -13,15 +13,15 @@ rabbit:
 
 model:
   model_path: ./yolo11n.pt
-  cut_layer:
+  cut_layer: 
     - 10
     - 5
   output_model: ./merged_model.pt
 
 dataset:
   dataset_path:
-    - ./datasets/livingroom_3_1.yaml
-    - ./datasets/coco128.yaml
+    - ./datasets/livingroom_2_1.yaml
+    - ./datasets/livingroom_2_2.yaml
     - ./datasets/livingroom_3_3.yaml
 
   concatenate_datasets: False
@@ -30,7 +30,7 @@ log_path: .
 
 learning:
   learning-rate: 0.0001
-  epochs: 1
+  epochs: 5
   momentum: 0.5
   batch-size: 16
   control-count: 3
