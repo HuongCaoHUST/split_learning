@@ -234,6 +234,9 @@ class Server:
     
     def merge_yolo_models(self):
         output_path = self.output_model
+        print("Total client: ", self.total_clients)
+        print("Hybrid_training: ", self.hybrid_training)
+        
         if self.total_clients[0] == 1:
             model1 = YOLO(self.best_model_layer_1[0])
             model2 = YOLO(self.best_model_2)
@@ -259,7 +262,7 @@ class Server:
 
             print(f"Đã ghép xong model và lưu tại: {output_path}")
             return output_path
-        elif self.total_clients[0] > 1:
+        elif self.total_clients[0] > 1 and self.hybrid_training == False:
             state_dicts = []
             for model_path in self.best_model_layer_1:
                 model = YOLO(model_path)
@@ -322,6 +325,66 @@ class Server:
                             avg_state_dict[key] = avg_weight
 
                         elif cut_min < layer_num <= cut_max:
+                            weights = [state_cut_high[key], state2[key]]
+                            avg_weight = sum(weights) / 2
+                            avg_state_dict[key] = avg_weight
+
+                        else:
+                            avg_state_dict[key] = state2[key]
+
+                    except:
+                        pass
+
+            new_state_dict = state2.copy()
+            new_state_dict.update(avg_state_dict)
+            model2.model.load_state_dict(new_state_dict)
+            model2.save(output_path)
+
+            print(f"Đã ghép xong model và lưu tại: {output_path}")
+            return output_path
+        elif self.total_clients[0] == 3 and self.hybrid_training == True:
+            print("___HYBRID LEARNING___")
+            cut1 = self.cut_layer[0]
+            cut2 = self.cut_layer[1]
+            cut3 = self.cut_layer[2]
+            
+            cuts = sorted([cut1, cut2, cut3])
+            cut_min = cuts[0]
+            cut_mid = cuts[1]
+            cut_max = cuts[2]
+
+            model_1a = YOLO(self.best_model_layer_1[0])
+            model_1b = YOLO(self.best_model_layer_1[1])
+            model_1c = YOLO(self.best_model_layer_1[2])
+            model2 = YOLO(self.best_model_2)
+
+            state_1a = model_1a.model.state_dict()
+            state_1b = model_1b.model.state_dict()
+            state_1c = model_1c.model.state_dict()
+            state2 = model2.model.state_dict()
+
+            state_cut_high = state_1a if cut1 == cut_max else (state_1b if cut2 == cut_max else state_1c)
+            state_cut_mid = state_1a if cut1 == cut_mid else (state_1b if cut2 == cut_mid else state_1c)
+            state_cut_low = state_1a if cut1 == cut_min else (state_1b if cut2 == cut_min else state_1c)
+
+            avg_state_dict = {}
+
+            for key in state2.keys():
+                if key.startswith("model."):
+                    try:
+                        layer_num = int(key.split('.')[1])
+
+                        if layer_num <= cut_min:
+                            weights = [state_1a[key], state_1b[key], state_1c[key]]
+                            avg_weight = sum(weights) / 3
+                            avg_state_dict[key] = avg_weight
+
+                        elif cut_min < layer_num <= cut_mid:
+                            weights = [state_cut_mid[key], state_cut_low[key], state2[key]]
+                            avg_weight = sum(weights) / 3
+                            avg_state_dict[key] = avg_weight
+
+                        elif cut_mid < layer_num <= cut_max:
                             weights = [state_cut_high[key], state2[key]]
                             avg_weight = sum(weights) / 2
                             avg_state_dict[key] = avg_weight
