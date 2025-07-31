@@ -84,6 +84,7 @@ class Server:
         # Model
         self.model_path = config["model"]["model_path"]
         self.cut_layer = config["model"]["cut_layer"]
+        self.hybrid_training = config["model"]["hybrid_training"]
         self.output_model = config["model"]["output_model"]
         self.best_model_layer_1 = []
         self.best_model_2 = None
@@ -125,7 +126,6 @@ class Server:
                 self.channel = self.connection.channel()
                 break
             except pika.exceptions.AMQPConnectionError:
-                print("⏳ Waiting for RabbitMQ to be ready...")
                 time.sleep(1)
     
     def start(self):
@@ -188,9 +188,9 @@ class Server:
 
         src.Log.print_with_color(f"notify_client", "red")
         print("self.list_client: ", self.list_clients)
-        layer1_clients = [(client_id, layer_id) for client_id, layer_id in self.list_clients if layer_id == 1]
+        self.layer1_clients = [(client_id, layer_id) for client_id, layer_id in self.list_clients if layer_id == 1]
 
-        print("layer1_client: ", layer1_clients)
+        print("layer1_client: ", self.layer1_clients)
 
         dataset_index = 0
         for (client_id, layer_id) in self.list_clients:
@@ -233,6 +233,7 @@ class Server:
         )
     
     def merge_yolo_models(self):
+        output_path = self.output_model
         if self.total_clients[0] == 1:
             model1 = YOLO(self.best_model_layer_1[0])
             model2 = YOLO(self.best_model_2)
@@ -258,9 +259,8 @@ class Server:
 
             print(f"Đã ghép xong model và lưu tại: {output_path}")
             return output_path
-        else:
+        elif self.total_clients[0] > 1:
             state_dicts = []
-            output_path = self.output_model
             for model_path in self.best_model_layer_1:
                 model = YOLO(model_path)
                 state_dicts.append(model.model.state_dict())
@@ -283,6 +283,57 @@ class Server:
             new_state_dict = state_dict2.copy()
             new_state_dict.update(avg_state_dict)
 
+            model2.model.load_state_dict(new_state_dict)
+            model2.save(output_path)
+
+            print(f"Đã ghép xong model và lưu tại: {output_path}")
+            return output_path
+        
+        elif self.total_clients[0] > 1 and self.hybrid_training == True:
+            print("___HYBRID LEARNING___")
+            cut1 = self.cut_layer[0]
+            cut2 = self.cut_layer[1]
+            
+            cut_min = min(cut1, cut2)
+            cut_max = max(cut1, cut2)
+
+            # Load models tương ứng
+            model_1a = YOLO(self.best_model_layer_1[0])
+            model_1b = YOLO(self.best_model_layer_1[1])
+            model2 = YOLO(self.best_model_2)
+
+            state_1a = model_1a.model.state_dict()
+            state_1b = model_1b.model.state_dict()
+            state2  = model2.model.state_dict()
+
+            # Model đại diện vùng B (cut lớn hơn)
+            state_cut_high = state_1a if cut1 > cut2 else state_1b
+
+            avg_state_dict = {}
+
+            for key in state2.keys():
+                if key.startswith("model."):
+                    try:
+                        layer_num = int(key.split('.')[1])
+
+                        if layer_num <= cut_min:
+                            weights = [state_1a[key], state_1b[key]]
+                            avg_weight = sum(weights) / 2
+                            avg_state_dict[key] = avg_weight
+
+                        elif cut_min < layer_num <= cut_max:
+                            weights = [state_cut_high[key], state2[key]]
+                            avg_weight = sum(weights) / 2
+                            avg_state_dict[key] = avg_weight
+
+                        else:
+                            avg_state_dict[key] = state2[key]
+
+                    except:
+                        pass
+
+            new_state_dict = state2.copy()
+            new_state_dict.update(avg_state_dict)
             model2.model.load_state_dict(new_state_dict)
             model2.save(output_path)
 
