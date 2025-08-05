@@ -276,28 +276,6 @@ class BaseModel(torch.nn.Module):
             if not success:
                 print(f"Không thể gửi data_store tới intermediate_queue.")
         return x
-    
-    def connect_rabbitmq(self):
-        """
-        Thiết lập kết nối tới RabbitMQ và trả về kênh (channel) để sử dụng.
-        """
-        try:
-            credentials = pika.PlainCredentials(self.username, self.password)
-            parameters = pika.ConnectionParameters(
-                host=self.address,
-                port=5672,
-                virtual_host='/',
-                credentials=credentials
-            )
-            
-            connection = pika.BlockingConnection(parameters)
-            
-            channel = connection.channel()
-            print("Kết nối tới RabbitMQ thành công!")
-            return channel
-        except Exception as e:
-            print(f"Lỗi kết nối tới RabbitMQ: {e}")
-            return None
 
     def send_to_intermediate_queue(self, data_id, data_store):
         queue_name = f'intermediate_queue_{self.layer_id}'

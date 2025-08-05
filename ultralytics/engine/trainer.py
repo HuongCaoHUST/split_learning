@@ -161,7 +161,7 @@ class BaseTrainer:
         self.address = self.args.address
         self.username = self.args.username
         self.password = self.args.password
-        self.channel= self.connect_rabbitmq()
+        self.channel= None
         
         # Cut_layer
         self.cut_layer = self.args.cut_layer    
@@ -406,7 +406,8 @@ class BaseTrainer:
         if world_size > 1:
             self._setup_ddp(world_size)
         self._setup_train(world_size)
-        self.model.channel = self.connect_rabbitmq()
+        self.channel = self.connect_rabbitmq()
+        self.model.channel = self.channel
         if self.layer_id == 1:
             nb = len(self.train_loader)  # number of batches
             nw = max(round(self.args.warmup_epochs * nb), 100) if self.args.warmup_epochs > 0 else -1  # warmup iterations
@@ -919,10 +920,10 @@ class BaseTrainer:
                             print(f"Received gradient for tensor_id {tensor_id}, shape: {grad.shape}")
                             gradient_dict[tensor_id] = grad
 
-                            # Backward
-                            tensor_list = [self.model.data_store[t_id] for t_id in gradient_dict.keys()]
-                            grad_list = [gradient_dict[t_id] for t_id in gradient_dict.keys()]
-                            torch.autograd.backward(tensor_list, grad_list)
+                        # Backward
+                        tensor_list = [self.model.data_store[t_id] for t_id in gradient_dict.keys()]
+                        grad_list = [gradient_dict[t_id] for t_id in gradient_dict.keys()]
+                        torch.autograd.backward(tensor_list, grad_list)
                         self.count_batch += 1
                         # print(f"Xong 01 Backward cho {data_id} nè!!!!!!!!!!!!!!!!!!")
                 else:
@@ -930,7 +931,7 @@ class BaseTrainer:
             except Exception as e:
                 print("Error in check_gradient thread:", e)
                 break
-            time.sleep(0.2)
+            time.sleep(1)
 
         thread_channel.close()
         thread_connection.close()
