@@ -65,10 +65,12 @@ class Client:
         # src.Log.print_with_color(f"[<<<] Client received: {self.response}", "blue")
         if action == "START":
             src.Log.print_with_color(f"[<<<] Client received: {self.response}", "blue")
-            if self.layer_id == 1:
+            if self.layer_id == 1 and self.virtual_machine:
                 result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, epochs, batch_size, self.address, self.username, self.password)
                 file_data = self.read_file(best)
-
+            else:
+                result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, epochs, batch_size, self.address, self.username, self.password)
+            
             if self.layer_id == 2:
                 result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, epochs, batch_size, self.address, self.username, self.password)
             
@@ -76,6 +78,7 @@ class Client:
                 data = {"action": "UPDATE", "client_id": self.client_id, "layer_id": self.layer_id,
                         "result": result, "message": "Sent parameters to Server", "vm": self.virtual_machine, "best": file_data}
             else:
+                best = str(best).replace("F:\\Do_an\\split_learning", "/app").replace("\\", "/")
                 data = {"action": "UPDATE", "client_id": self.client_id, "layer_id": self.layer_id,
                         "result": result, "message": "Sent parameters to Server", "vm": self.virtual_machine, "best": best}
             

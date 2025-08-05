@@ -26,7 +26,7 @@ with open('config.yaml', 'r') as file:
 client_id = uuid.uuid4()
 if args.layer_id == 2:
     address = "172.18.0.2"
-elif args.layer_id == 1 and args.docker == True :
+elif args.layer_id == 1 and args.docker == True and args.vm == False:
     address = "172.18.0.2"
 elif args.layer_id == 1 and args.docker == True and args.vm == True:
     address = "192.168.0.101"    
