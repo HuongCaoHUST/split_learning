@@ -173,8 +173,8 @@ class Server:
                 print("BEST_layer_1.pt:", best)
             elif layer_id == 1 and virtual_machine:
                 best = message["best"]
-                src.Log.print_with_color(f"[<<<] Received best model from client: {best}", "blue")
                 best = self.save_model_file(best, best_dir="./best_model_vm")
+                src.Log.print_with_color(f"[<<<] Received best model from client: {best}", "blue")
                 self.best_model_layer_1.append(best)
             
             elif layer_id == 2:
@@ -182,6 +182,8 @@ class Server:
                 src.Log.print_with_color(f"[<<<] Received best model from client: {best}", "blue")
                 self.best_model_2 = best
                 print("BEST_2.pt:", self.best_model_2)
+
+                print("Best model layer 1 full: ", self.best_model_layer_1)
                 merge_model = self.merge_yolo_models()
                 args = dict(model=merge_model, data=self.dataset_path[0])
                 validator = DetectionValidator(args=args)
@@ -243,7 +245,7 @@ class Server:
                     dataset_index += 1
                 elif layer_id == 2:
                     response["cut_layer"] = self.cut_layer
-                    response["dataset_path"] = "/app/datasets/livingroom_3_1.yaml"
+                    response["dataset_path"] = "/app/datasets/livingroom_4_1.yaml"
 
             self.time_start = time.time_ns()
             src.Log.print_with_color(f"[>>>] Sent start training request to client {client_id}", "red")

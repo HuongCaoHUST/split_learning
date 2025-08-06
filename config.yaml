@@ -2,7 +2,7 @@ name: Split Learning
 server:
   num-round: 1
   clients:
-    - 2
+    - 4
     - 1
   model: YOLO11n
 
@@ -16,15 +16,17 @@ model:
   cut_layer: 
     - 10
     - 10
-    - 5
+    - 10
+    - 10
   hybrid_training: False
   output_model: ./merged_model.pt
 
 dataset:
   dataset_path:
-    - ./datasets/livingroom_3_1.yaml
-    - ./datasets/livingroom_3_2.yaml
-    - ./datasets/livingroom_3_3.yaml
+    - ./datasets/livingroom_4_1.yaml
+    - ./datasets/livingroom_4_2.yaml
+    - ./datasets/livingroom_4_3.yaml
+    - ./datasets/livingroom_4_4.yaml
 
   concatenate_datasets: False
 
@@ -32,7 +34,7 @@ log_path: .
 
 learning:
   learning-rate: 0.0001
-  epochs: 1
+  epochs: 2
   momentum: 0.5
   batch-size: 16
   control-count: 3

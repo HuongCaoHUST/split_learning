@@ -416,6 +416,7 @@ class BaseTrainer:
             print("Self.tensor_send_ids: ", self.tensor_send_ids)
             print("Seld.client_ids: ", self.client_ids)
             print("Seld.cut_layer_ids: ", self.cut_layer_ids)
+            print("Sum number batch: ", nb)
             self.model.client_ids = self.client_ids
             self.model.cut_layer_ids = self.cut_layer_ids
             self.model.tensor_send_ids = self.tensor_send_ids
