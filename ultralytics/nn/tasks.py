@@ -275,6 +275,8 @@ class BaseModel(torch.nn.Module):
             success = self.send_to_intermediate_queue(data_id, data_store)
             if not success:
                 print(f"Không thể gửi data_store tới intermediate_queue.")
+
+        self.end_batch_time = time.time()
         return x
 
     def send_to_intermediate_queue(self, data_id, data_store):

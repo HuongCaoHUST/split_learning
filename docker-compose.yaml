@@ -47,19 +47,19 @@ services:
     working_dir: /app
     command: ["python", "client.py", "--layer_id", "2"]
 
-  client_1_1:
-    container_name: split_learning_client_1_1
-    image: split_learning-server
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-      server:
-        condition: service_started
-    volumes:
-      - .:/app
-    working_dir: /app
-    command: ["python", "client.py", "--layer_id", "1", "--docker"]
-    mem_limit: 4g
+  # client_1_1:
+  #   container_name: split_learning_client_1_1
+  #   image: split_learning-server
+  #   depends_on:
+  #     rabbitmq:
+  #       condition: service_healthy
+  #     server:
+  #       condition: service_started
+  #   volumes:
+  #     - .:/app
+  #   working_dir: /app
+  #   command: ["python", "client.py", "--layer_id", "1", "--docker"]
+  #   mem_limit: 4g
 
   # client_1_2:
   #   container_name: split_learning_client_1_2

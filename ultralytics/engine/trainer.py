@@ -187,7 +187,7 @@ class BaseTrainer:
         self.plot_idx = [0, 1, 2]
 
         if self.layer_id == 1:
-            self.init_csv('log_time.csv', ['epoch', 'forward_and_backward', 'training_time'])
+            self.init_csv('log_time.csv', ['client_id', 'epoch', 'forward/backward/end_epoch', 'duration'])
 
         # HUB
         self.hub_session = None
@@ -462,6 +462,7 @@ class BaseTrainer:
             LOGGER.info(f"START TRAINING IN CLIENT 1")
             while True:
                 self.epoch = epoch
+                start_epoch_time = time.time()
                 self.run_callbacks("on_train_epoch_start")
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")  # suppress 'Detected lr_scheduler.step() before optimizer.step()'
@@ -490,6 +491,7 @@ class BaseTrainer:
                     self.start_thread()
                 #Training loop   
                 for i, batch in pbar:
+                    start_batch_time = time.time()
                     self.run_callbacks("on_train_batch_start")
                     # Warmup
                     ni = i + nb * epoch
@@ -505,17 +507,23 @@ class BaseTrainer:
                                 x["momentum"] = np.interp(ni, xi, [self.args.warmup_momentum, self.args.momentum])
                     # Forward
                     with autocast(self.amp):
-                        start_batch_time = time.time()
                         batch = self.preprocess_batch(batch)
                         if self.layer_id == 1:
                             data_id = uuid.uuid4()
                             success = self.send_label(data_id, batch)
-                            end_batch_time = time.time()
-                            duration = round(end_batch_time - start_batch_time, 2)
-                            print("Duration: ", duration)
                             if not success:
                                 print(f"Không thể gửi batch {i} tới label_queue.")
+
+                        # Forward in task
                         preds = self.model(batch["img"])
+
+                        duration = round(self.model.end_batch_time - start_batch_time, 2)
+                        self.log_to_csv('log_time.csv', {
+                            'client_id': self.client_id,
+                            'epoch': epoch+1,
+                            'forward/backward/end_epoch': 'forward',
+                            'duration': round(duration, 2)
+                        })
                     # success_grad, gradient_dict = self.wait_gradient()
 
                     # if not success_grad:
@@ -588,7 +596,6 @@ class BaseTrainer:
                     break  # must break all DDP ranks
                 epoch += 1
         else:
-            print("CLIENT 2 HELLO WORLD!!!")
             LOGGER.info(f"START TRAINING IN CLIENT 2")
             while True:
                 self.epoch = epoch
