@@ -653,6 +653,7 @@ class BaseTrainer:
                         })
                     
                     # Backward
+                    start_batch_backward_time = time.time()
                     self.scaler.scale(self.loss).backward()
                     if self.layer_id == 2:
                         if hasattr(self.model, 'saved_tensor'):
@@ -670,6 +671,17 @@ class BaseTrainer:
                                 success = self.send_gradient(data_id, gradient_store)
                                 if not success:
                                     print(f"Không thể gửi Gradients {i} tới Gradient_queue.")
+
+                                # Log
+                                end_batch_backward_time = time.time()
+                                duration = round(end_batch_backward_time - start_batch_backward_time, 2)
+                                self.log_to_csv('./log/log_time.csv', {
+                                    'layer_id': self.layer_id,
+                                    'client_id': self.client_id,
+                                    'epoch': epoch+1,
+                                    'forward/backward/end_epoch': 'backward',
+                                    'duration': round(duration, 2)
+                                })
                         
                         if hasattr(self.model, 'saved_data_store'):
                             for tensor_id, tensor in self.model.saved_data_store.items():
@@ -923,6 +935,7 @@ class BaseTrainer:
                 if thread_channel is not None and thread_channel.is_open:
                     method_frame, header_frame, body = thread_channel.basic_get(queue=queue_name, auto_ack=True)
                     if method_frame and body:
+                        start_batch_backward_time = time.time()
                         received_data = pickle.loads(body)
                         data_id = received_data.get('data_id')
                         print("\nDATA_ID backward: ", data_id)
@@ -946,6 +959,17 @@ class BaseTrainer:
                         grad_list = [gradient_dict[t_id] for t_id in gradient_dict.keys()]
                         torch.autograd.backward(tensor_list, grad_list)
                         self.count_batch += 1
+                        
+                        # Log
+                        end_batch_backward_time = time.time()
+                        duration = round(end_batch_backward_time - start_batch_backward_time, 2)
+                        self.log_to_csv('./log/log_time.csv', {
+                            'layer_id': self.layer_id,
+                            'client_id': self.client_id,
+                            'epoch': self.epoch+1,
+                            'forward/backward/end_epoch': 'backward',
+                            'duration': round(duration, 2)
+                        })
                 else:
                     print("Thread channel is None or closed")
             except Exception as e:
