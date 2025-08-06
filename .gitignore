@@ -169,4 +169,4 @@ cython_debug/
 *.pt
 /train113
 /best_model_vm
-*.csv
+/log
