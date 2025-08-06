@@ -461,6 +461,7 @@ class BaseTrainer:
         if self.layer_id == 1:
             LOGGER.info(f"START TRAINING IN CLIENT 1")
             while True:
+                start_epoch_time = time.time()
                 self.epoch = epoch
                 self.run_callbacks("on_train_epoch_start")
                 with warnings.catch_warnings():
@@ -559,6 +560,16 @@ class BaseTrainer:
                     self.run_callbacks("on_train_batch_end")
                 self.wait_all_backward(expected_num=nb)
                 self.lr = {f"lr/pg{ir}": x["lr"] for ir, x in enumerate(self.optimizer.param_groups)}  # for loggers
+
+                end_epoch_time = time.time()
+                duration = round(end_epoch_time - start_epoch_time, 2)
+                self.log_to_csv('./log/log_time.csv', {
+                    'layer_id': '--',
+                    'client_id': '--',
+                    'epoch': epoch+1,
+                    'forward/backward/end_epoch': 'end_epoch',
+                    'duration': round(duration, 2)
+                })
                 self.run_callbacks("on_train_epoch_end")
                 if RANK in {-1, 0}:
                     final_epoch = epoch + 1 >= self.epochs
@@ -671,17 +682,6 @@ class BaseTrainer:
                                 success = self.send_gradient(data_id, gradient_store)
                                 if not success:
                                     print(f"Không thể gửi Gradients {i} tới Gradient_queue.")
-
-                                # Log
-                                end_batch_backward_time = time.time()
-                                duration = round(end_batch_backward_time - start_batch_backward_time, 2)
-                                self.log_to_csv('./log/log_time.csv', {
-                                    'layer_id': self.layer_id,
-                                    'client_id': self.client_id,
-                                    'epoch': epoch+1,
-                                    'forward/backward/end_epoch': 'backward',
-                                    'duration': round(duration, 2)
-                                })
                         
                         if hasattr(self.model, 'saved_data_store'):
                             for tensor_id, tensor in self.model.saved_data_store.items():
@@ -704,6 +704,17 @@ class BaseTrainer:
                                 self.stop = broadcast_list[0]
                             if self.stop:  # training time exceeded
                                 break
+                    
+                    # Log time
+                        end_batch_backward_time = time.time()
+                        duration = round(end_batch_backward_time - start_batch_backward_time, 2)
+                        self.log_to_csv('./log/log_time.csv', {
+                            'layer_id': self.layer_id,
+                            'client_id': self.client_id,
+                            'epoch': epoch+1,
+                            'forward/backward/end_epoch': 'backward',
+                            'duration': round(duration, 2)
+                        })
 
                     # Log
                     if RANK in {-1, 0}:
