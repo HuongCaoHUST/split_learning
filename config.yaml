@@ -2,7 +2,7 @@ name: Split Learning
 server:
   num-round: 1
   clients:
-    - 3
+    - 2
     - 1
   model: YOLO11n
 
@@ -17,7 +17,7 @@ model:
     - 10
     - 10
     - 5
-  hybrid_training: True
+  hybrid_training: False
   output_model: ./merged_model.pt
 
 dataset:

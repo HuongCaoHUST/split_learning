@@ -166,22 +166,24 @@ class Server:
         elif action == "UPDATE":
             client_id = message["client_id"]
             virtual_machine=message["vm"]
-            src.Log.print_with_color(f"[<<<] Received best model from client: {best}", "blue")
-            if layer_id == 1:
+            if layer_id == 1 and not virtual_machine:
                 best = message["best"]
+                src.Log.print_with_color(f"[<<<] Received best model from client: {best}", "blue")
                 self.best_model_layer_1.append(best)
                 print("BEST_layer_1.pt:", best)
             elif layer_id == 1 and virtual_machine:
                 best = message["best"]
+                src.Log.print_with_color(f"[<<<] Received best model from client: {best}", "blue")
                 best = self.save_model_file(best, best_dir="./best_model_vm")
                 self.best_model_layer_1.append(best)
-                
+            
             elif layer_id == 2:
                 best = message["best"]
+                src.Log.print_with_color(f"[<<<] Received best model from client: {best}", "blue")
                 self.best_model_2 = best
                 print("BEST_2.pt:", self.best_model_2)
                 merge_model = self.merge_yolo_models()
-                args = dict(model=merge_model, data="/app/datasets/livingroom_2_1.yaml")
+                args = dict(model=merge_model, data=self.dataset_path[0])
                 validator = DetectionValidator(args=args)
                 validator()
                 sys.exit()

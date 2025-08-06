@@ -635,15 +635,15 @@ class BaseTrainer:
                     self.scaler.scale(self.loss).backward()
                     if self.layer_id == 2:
                         if hasattr(self.model, 'saved_tensor'):
-                            gradient_store = {}  # Dictionary để lưu gradient
+                            gradient_store = {}
                             for tensor_id, tensor in self.model.saved_tensor.items():
                                 if tensor.grad is not None:
-                                    print(f"Gradient shape của tensor {tensor_id}: {tensor.grad.shape}")  # [batch_size, 32, 160, 160]
+                                    print(f"Gradient shape của tensor {tensor_id}: {tensor.grad.shape}")
                                     gradient_store[tensor_id] = tensor.grad
                                 else:
                                     print(f"Gradient của tensor {tensor_id} là None")
                             
-                            # Gửi gradient qua queue
+                            # Send gradients to gradient_queue
                             if gradient_store:
                                 data_id = self.model.input_data_id
                                 success = self.send_gradient(data_id, gradient_store)
@@ -925,7 +925,6 @@ class BaseTrainer:
                         grad_list = [gradient_dict[t_id] for t_id in gradient_dict.keys()]
                         torch.autograd.backward(tensor_list, grad_list)
                         self.count_batch += 1
-                        # print(f"Xong 01 Backward cho {data_id} nè!!!!!!!!!!!!!!!!!!")
                 else:
                     print("Thread channel is None or closed")
             except Exception as e:
