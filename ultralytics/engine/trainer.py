@@ -536,19 +536,19 @@ class BaseTrainer:
 
                     # torch.autograd.backward(tensor_list, grad_list)
 
-                    # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
-                    if ni - last_opt_step >= self.accumulate:
-                        self.optimizer_step()
-                        last_opt_step = ni
-                        # Timed stopping
-                        if self.args.time:
-                            self.stop = (time.time() - self.train_time_start) > (self.args.time * 3600)
-                            if RANK != -1:  # if DDP training
-                                broadcast_list = [self.stop if RANK == 0 else None]
-                                dist.broadcast_object_list(broadcast_list, 0)  # broadcast 'stop' to all ranks
-                                self.stop = broadcast_list[0]
-                            if self.stop:  # training time exceeded
-                                break
+                    # # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
+                    # if ni - last_opt_step >= self.accumulate:
+                    #     self.optimizer_step()
+                    #     last_opt_step = ni
+                    #     # Timed stopping
+                    #     if self.args.time:
+                    #         self.stop = (time.time() - self.train_time_start) > (self.args.time * 3600)
+                    #         if RANK != -1:  # if DDP training
+                    #             broadcast_list = [self.stop if RANK == 0 else None]
+                    #             dist.broadcast_object_list(broadcast_list, 0)  # broadcast 'stop' to all ranks
+                    #             self.stop = broadcast_list[0]
+                    #         if self.stop:  # training time exceeded
+                    #             break
                     # Log
                     if RANK in {-1, 0}:
                         pbar.set_description(f"{epoch + 1}/{self.epochs}")
@@ -959,7 +959,18 @@ class BaseTrainer:
                         grad_list = [gradient_dict[t_id] for t_id in gradient_dict.keys()]
                         torch.autograd.backward(tensor_list, grad_list)
                         self.count_batch += 1
-                        
+
+                        # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
+                        self.optimizer_step()
+                        if self.args.time:
+                            self.stop = (time.time() - self.train_time_start) > (self.args.time * 3600)
+                            if RANK != -1:  # if DDP training
+                                broadcast_list = [self.stop if RANK == 0 else None]
+                                dist.broadcast_object_list(broadcast_list, 0)  # broadcast 'stop' to all ranks
+                                self.stop = broadcast_list[0]
+                            if self.stop:  # training time exceeded
+                                break
+
                         # Log
                         end_batch_backward_time = time.time()
                         duration = round(end_batch_backward_time - start_batch_backward_time, 2)
