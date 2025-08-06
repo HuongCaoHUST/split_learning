@@ -296,9 +296,6 @@ class BaseModel(torch.nn.Module):
         return True
     
     def get_tensor_send_id (self, cut_layer):
-        """
-        Trả về tập hợp các ID của các lớp mà mô hình sẽ gửi tensor tới hàng đợi.
-        """
         tensor_send_id = []
         mf_values = []
         layer_indices = []
@@ -325,47 +322,7 @@ class BaseModel(torch.nn.Module):
         tensor_send_id.append(cut_layer)
         print ("SEND tensor id: ", tensor_send_id)
         return tensor_send_id
-                
-        # if cut_layer <=3:
-        #     return [cut_layer]
-        # elif cut_layer == 4:
-        #     return [cut_layer]
-        # elif cut_layer == 5:
-        #     return [4, cut_layer]
-        # elif cut_layer == 6:
-        #     return [4, cut_layer]
-        # elif cut_layer == 7:
-        #     return [4, 6, cut_layer]
-        # elif cut_layer == 8:
-        #     return [4, 6, cut_layer]
-        # elif cut_layer == 9:
-        #     return [4, 6, cut_layer]
-        # elif cut_layer == 10:
-        #     return [4, 6, cut_layer]
-        # elif cut_layer == 11:
-        #     return [4, 6, 10, cut_layer]
-        # elif cut_layer == 12:
-        #     return [4, 10, cut_layer]
-        # elif cut_layer == 13:
-        #     return [4, 10, cut_layer]
-        # elif cut_layer == 14:
-        #     return [4, 10, 13, cut_layer]
-        # elif cut_layer == 15:
-        #     return [10, 13, cut_layer]
-        # elif cut_layer == 16:
-        #     return [10, 13, cut_layer]
-        # elif cut_layer == 17:
-        #     return [10, 13, 16, cut_layer]
-        # elif cut_layer == 18:
-        #     return [10, 16, cut_layer]
-        # elif cut_layer == 19:
-        #     return [10, 16, cut_layer]
-        # elif cut_layer == 20:
-        #     return [10, 16, 19, cut_layer]
-        # elif cut_layer == 21:
-        #     return [16, 19, cut_layer]
-        # elif cut_layer == 22:
-        #     return [16, 19, cut_layer]
+    
     
     def start_thread(self, forward_queue):
         """START THREADING"""

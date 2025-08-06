@@ -2,7 +2,7 @@ name: Split Learning
 server:
   num-round: 1
   clients:
-    - 4
+    - 1
     - 1
   model: YOLO11n
 

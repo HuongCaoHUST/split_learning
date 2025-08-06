@@ -163,17 +163,13 @@ class BaseTrainer:
         self.password = self.args.password
         self.channel= None
         
-        # Cut_layer
-        self.cut_layer = self.args.cut_layer    
-        if self.layer_id == 1:
-            self.tensor_send_ids = self.get_tensor_send_id(self.cut_layer)
-        elif self.layer_id == 2:
-            self.cut_layer_ids = []
-            self.tensor_send_ids = []
         # Model and Dataset
         self.model = check_model_file_from_stem(self.args.model)  # add suffix, i.e. yolo11n -> yolo11n.pt
         with torch_distributed_zero_first(LOCAL_RANK):  # avoid auto-downloading dataset multiple times
             self.data = self.get_dataset()
+
+        # Cut_layer
+        self.cut_layer = self.args.cut_layer    
 
         self.ema = None
 
@@ -394,6 +390,14 @@ class BaseTrainer:
                 momentum=self.args.momentum,
                 decay=weight_decay,
             )
+
+        # Tensor IDS get
+        if self.layer_id == 1:
+            self.tensor_send_ids = self.get_tensor_send_id(self.cut_layer)
+        elif self.layer_id == 2:
+            self.cut_layer_ids = []
+            self.tensor_send_ids = []
+            
         # Scheduler
         self._setup_scheduler()
         self.stopper, self.stop = EarlyStopping(patience=self.args.patience), False
@@ -946,49 +950,32 @@ class BaseTrainer:
 
 
     def get_tensor_send_id (self, cut_layer):
-        """
-        Trả về tập hợp các ID của các lớp mà mô hình sẽ gửi tensor tới hàng đợi.
-        """
-        if cut_layer <=3:
-            return [cut_layer]
-        elif cut_layer == 4:
-            return [cut_layer]
-        elif cut_layer == 5:
-            return [4, cut_layer]
-        elif cut_layer == 6:
-            return [4, cut_layer]
-        elif cut_layer == 7:
-            return [4, 6, cut_layer]
-        elif cut_layer == 8:
-            return [4, 6, cut_layer]
-        elif cut_layer == 9:
-            return [4, 6, cut_layer]
-        elif cut_layer == 10:
-            return [4, 6, cut_layer]
-        elif cut_layer == 11:
-            return [4, 6, 10, cut_layer]
-        elif cut_layer == 12:
-            return [4, 10, cut_layer]
-        elif cut_layer == 13:
-            return [4, 10, cut_layer]
-        elif cut_layer == 14:
-            return [4, 10, 13,cut_layer]
-        elif cut_layer == 15:
-            return [10, 13, cut_layer]
-        elif cut_layer == 16:
-            return [10, 13, cut_layer]
-        elif cut_layer == 17:
-            return [10, 13, 16, cut_layer]
-        elif cut_layer == 18:
-            return [10, 16, cut_layer]
-        elif cut_layer == 19:
-            return [10, 16, cut_layer]
-        elif cut_layer == 20:
-            return [10, 16, 19, cut_layer]
-        elif cut_layer == 21:
-            return [16, 19, cut_layer]
-        elif cut_layer == 22:
-            return [16, 19, cut_layer]
+        tensor_send_id = []
+        mf_values = []
+        layer_indices = []
+        for idx, m in enumerate(self.model.model):
+            f = m.f
+            if f != -1:
+                if isinstance(f, int):
+                    f = [f]
+                for fi in f:
+                    if fi != -1:
+                        layer_indices.append(idx)
+                        mf_values.append(fi)
+        mf_values_sorted = sorted(mf_values)
+
+        for value in mf_values_sorted:
+            if value < cut_layer:
+                tensor_send_id.append(value)
+
+        indices_to_mf = dict(zip(layer_indices, mf_values))
+        for idx, val in indices_to_mf.items():
+            if idx <=cut_layer:
+                tensor_send_id.remove(val)
+
+        tensor_send_id.append(cut_layer)
+        print ("SEND tensor id: ", tensor_send_id)
+        return tensor_send_id
 
     def init_csv(self, csv_file, headers):
         """
@@ -997,7 +984,7 @@ class BaseTrainer:
         df = pd.DataFrame(columns=headers)
         df.to_csv(csv_file, index=False)
     
-    def log_to_csv(csv_file, data_dict):
+    def log_to_csv(self, csv_file, data_dict):
         """
         Log to csv file
         """
