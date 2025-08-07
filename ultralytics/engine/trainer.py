@@ -564,8 +564,8 @@ class BaseTrainer:
                 end_epoch_time = time.time()
                 duration = round(end_epoch_time - start_epoch_time, 2)
                 self.log_to_csv('./log/log_time.csv', {
-                    'layer_id': '--',
-                    'client_id': '--',
+                    'layer_id': self.layer_id,
+                    'client_id': self.client_id,
                     'epoch': epoch+1,
                     'forward/backward/end_epoch': 'end_epoch',
                     'duration': round(duration, 2)
@@ -988,7 +988,7 @@ class BaseTrainer:
                         self.log_to_csv('./log/log_time.csv', {
                             'layer_id': self.layer_id,
                             'client_id': self.client_id,
-                            'epoch': self.epoch+1,
+                            'epoch': self.epoch + 1,
                             'forward/backward/end_epoch': 'backward',
                             'duration': round(duration, 2)
                         })
