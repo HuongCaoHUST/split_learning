@@ -5,29 +5,35 @@ server:
     - 1
     - 1
   model: YOLO11n
-  parameters:
-    load: True
-    save: True
-  validation: True
 
 rabbit:
-  address: 127.0.0.1
+  address: 172.18.0.2
   username: user
   password: password
 
 model:
   model_path: ./yolo11n.pt
-  cut_layer: 10
+  cut_layer: 
+    - 10
+    - 10
+    - 10
+
+  hybrid_training: False
   output_model: ./merged_model.pt
 
 dataset:
-  dataset_path: ./datasets/coco128.yaml
+  dataset_path:
+    - ./datasets/livingroom_4_1.yaml
+    - ./datasets/livingroom_3_2.yaml
+    - ./datasets/livingroom_3_3.yaml
+
+  concatenate_datasets: False
 
 log_path: .
 
 learning:
   learning-rate: 0.0001
-  epochs: 2
+  epochs: 1
   momentum: 0.5
   batch-size: 16
   control-count: 3

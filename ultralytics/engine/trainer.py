@@ -23,6 +23,7 @@ from torch import nn, optim
 import pika
 import pickle
 import uuid
+import pandas as pd
 import json
 import tqdm
 import threading
@@ -155,19 +156,20 @@ class BaseTrainer:
         #Rabbit MQ
         self.client_id = self.args.client_id
         self.layer_id = self.args.layer_id    
+        self.num_client = self.args.num_client
+        self.client_ids = []
         self.address = self.args.address
         self.username = self.args.username
         self.password = self.args.password
-        self.channel= self.connect_rabbitmq()
-        print("Self.channel in trainer: ", self.channel)
+        self.channel= None
         
-        # Cut_layer
-        self.cut_layer = self.args.cut_layer    
-        self.tensor_send_ids = self.get_tensor_send_id(self.cut_layer)
         # Model and Dataset
         self.model = check_model_file_from_stem(self.args.model)  # add suffix, i.e. yolo11n -> yolo11n.pt
         with torch_distributed_zero_first(LOCAL_RANK):  # avoid auto-downloading dataset multiple times
             self.data = self.get_dataset()
+
+        # Cut_layer
+        self.cut_layer = self.args.cut_layer    
 
         self.ema = None
 
@@ -184,6 +186,9 @@ class BaseTrainer:
         self.csv = self.save_dir / "results.csv"
         self.plot_idx = [0, 1, 2]
 
+        if self.layer_id == 1:
+            self.init_csv('./log/log_time.csv', ['layer_id', 'client_id', 'epoch', 'forward/backward/end_epoch', 'duration'])
+
         # HUB
         self.hub_session = None
 
@@ -198,29 +203,21 @@ class BaseTrainer:
         if self.layer_id == 1:
             self.condition = threading.Condition()
 
+        self.validate_intermediate = True  # validate intermediate epochs
 
     def connect_rabbitmq(self):
-        """
-        Thiết lập kết nối tới RabbitMQ và trả về kênh (channel) để sử dụng.
-        """
         try:
-            # Tạo thông tin xác thực
             credentials = pika.PlainCredentials(self.username, self.password)
-            # Tạo tham số kết nối
             parameters = pika.ConnectionParameters(
                 host=self.address,
                 port=5672,
                 virtual_host='/',
                 credentials=credentials
             )
-            # Thiết lập kết nối
             connection = pika.BlockingConnection(parameters)
-            # Tạo kênh
             channel = connection.channel()
-            print("Kết nối tới RabbitMQ thành công!")
             return channel
         except Exception as e:
-            print(f"Lỗi kết nối tới RabbitMQ: {e}")
             return None
 
     def add_callback(self, event: str, callback):
@@ -394,6 +391,14 @@ class BaseTrainer:
                 momentum=self.args.momentum,
                 decay=weight_decay,
             )
+
+        # Tensor IDS get
+        if self.layer_id == 1:
+            self.tensor_send_ids = self.get_tensor_send_id(self.cut_layer)
+        elif self.layer_id == 2:
+            self.cut_layer_ids = []
+            self.tensor_send_ids = []
+            
         # Scheduler
         self._setup_scheduler()
         self.stopper, self.stop = EarlyStopping(patience=self.args.patience), False
@@ -406,12 +411,20 @@ class BaseTrainer:
         if world_size > 1:
             self._setup_ddp(world_size)
         self._setup_train(world_size)
-        self.model.channel = self.connect_rabbitmq()
+        self.channel = self.connect_rabbitmq()
+        self.model.channel = self.channel
         if self.layer_id == 1:
             nb = len(self.train_loader)  # number of batches
             nw = max(round(self.args.warmup_epochs * nb), 100) if self.args.warmup_epochs > 0 else -1  # warmup iterations
         else:
-            nb = self.wait_for_number_batch()
+            nb = self.wait_for_number_batch_client_id()
+            print("Self.tensor_send_ids: ", self.tensor_send_ids)
+            print("Seld.client_ids: ", self.client_ids)
+            print("Seld.cut_layer_ids: ", self.cut_layer_ids)
+            print("Sum number batch: ", nb)
+            self.model.client_ids = self.client_ids
+            self.model.cut_layer_ids = self.cut_layer_ids
+            self.model.tensor_send_ids = self.tensor_send_ids
             nw = 1
         last_opt_step = -1
         self.epoch_time = None
@@ -431,7 +444,8 @@ class BaseTrainer:
                 f"Logging results to {colorstr('bold', self.save_dir)}\n"
                 f"Starting training for " + (f"{self.args.time} hours..." if self.args.time else f"{self.epochs} epochs...")
             )
-        # Đặt cờ is_training thành True trước khi huấn luyện
+
+        # Set training flag
         if hasattr(self.model, 'module') and hasattr(self.model.module, 'is_training'):
             self.model.module.is_training = True
         elif hasattr(self.model, 'is_training'):
@@ -446,7 +460,9 @@ class BaseTrainer:
         epoch = self.start_epoch
         self.optimizer.zero_grad()  # zero any resumed gradients to ensure stability on train start
         if self.layer_id == 1:
+            LOGGER.info(f"START TRAINING IN CLIENT 1")
             while True:
+                start_epoch_time = time.time()
                 self.epoch = epoch
                 self.run_callbacks("on_train_epoch_start")
                 with warnings.catch_warnings():
@@ -463,19 +479,20 @@ class BaseTrainer:
                     self.train_loader.reset()
 
                 if RANK in {-1, 0}:
-                    LOGGER.info(self.progress_string())
+                    # LOGGER.info(self.progress_string())
                     pbar = TQDM(enumerate(self.train_loader), total=nb)
                 self.tloss = None
 
                 # Send number_batch to RabbitMQ
                 if epoch == 0:
-                    success = self.send_number_batch(nb)
+                    success = self.send_number_batch_client_id(nb, self.client_id, self.cut_layer, self.tensor_send_ids)
                     if not success:
                         print(f"Không thể gửi number_batch tới queue.")
                 if self.model.is_training == True:
                     self.start_thread()
                 #Training loop   
                 for i, batch in pbar:
+                    start_batch_forward_time = time.time()
                     self.run_callbacks("on_train_batch_start")
                     # Warmup
                     ni = i + nb * epoch
@@ -497,7 +514,18 @@ class BaseTrainer:
                             success = self.send_label(data_id, batch)
                             if not success:
                                 print(f"Không thể gửi batch {i} tới label_queue.")
+
+                        # Forward in task
                         preds = self.model(batch["img"])
+
+                        duration = round(self.model.end_batch_forward_time - start_batch_forward_time, 2)
+                        self.log_to_csv('./log/log_time.csv', {
+                            'layer_id': self.layer_id,
+                            'client_id': self.client_id,
+                            'epoch': epoch+1,
+                            'forward/backward/end_epoch': 'forward',
+                            'duration': round(duration, 2)
+                        })
                     # success_grad, gradient_dict = self.wait_gradient()
 
                     # if not success_grad:
@@ -510,22 +538,40 @@ class BaseTrainer:
 
                     # torch.autograd.backward(tensor_list, grad_list)
 
-                    # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
-                    if ni - last_opt_step >= self.accumulate:
-                        self.optimizer_step()
-                        last_opt_step = ni
-                        # Timed stopping
-                        if self.args.time:
-                            self.stop = (time.time() - self.train_time_start) > (self.args.time * 3600)
-                            if RANK != -1:  # if DDP training
-                                broadcast_list = [self.stop if RANK == 0 else None]
-                                dist.broadcast_object_list(broadcast_list, 0)  # broadcast 'stop' to all ranks
-                                self.stop = broadcast_list[0]
-                            if self.stop:  # training time exceeded
-                                break
+                    # # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
+                    # if ni - last_opt_step >= self.accumulate:
+                    #     self.optimizer_step()
+                    #     last_opt_step = ni
+                    #     # Timed stopping
+                    #     if self.args.time:
+                    #         self.stop = (time.time() - self.train_time_start) > (self.args.time * 3600)
+                    #         if RANK != -1:  # if DDP training
+                    #             broadcast_list = [self.stop if RANK == 0 else None]
+                    #             dist.broadcast_object_list(broadcast_list, 0)  # broadcast 'stop' to all ranks
+                    #             self.stop = broadcast_list[0]
+                    #         if self.stop:  # training time exceeded
+                    #             break
+                    # Log
+                    if RANK in {-1, 0}:
+                        pbar.set_description(f"{epoch + 1}/{self.epochs}")
+                        self.run_callbacks("on_batch_end")
+                        if self.args.plots and ni in self.plot_idx:
+                            self.plot_training_samples(batch, ni)
+                            
                     self.run_callbacks("on_train_batch_end")
                 self.wait_all_backward(expected_num=nb)
+
                 self.lr = {f"lr/pg{ir}": x["lr"] for ir, x in enumerate(self.optimizer.param_groups)}  # for loggers
+
+                end_epoch_time = time.time()
+                duration = round(end_epoch_time - start_epoch_time, 2)
+                self.log_to_csv('./log/log_time.csv', {
+                    'layer_id': self.layer_id,
+                    'client_id': self.client_id,
+                    'epoch': epoch+1,
+                    'forward/backward/end_epoch': 'end_epoch',
+                    'duration': round(duration, 2)
+                })
                 self.run_callbacks("on_train_epoch_end")
                 if RANK in {-1, 0}:
                     final_epoch = epoch + 1 >= self.epochs
@@ -563,7 +609,7 @@ class BaseTrainer:
                     break  # must break all DDP ranks
                 epoch += 1
         else:
-            print("CLIENT 2 HELLO WORLD!!!")
+            LOGGER.info(f"START TRAINING IN CLIENT 2")
             while True:
                 self.epoch = epoch
                 self.run_callbacks("on_train_epoch_start")
@@ -577,11 +623,6 @@ class BaseTrainer:
 
                 fake_batches = [None] * nb
                 pbar = enumerate(fake_batches)
-                # # Update dataloader attributes (optional)
-                # if self.layer_id != 2 or self.layer_id != 1:
-                #     if epoch == (self.epochs - self.args.close_mosaic):
-                #         self._close_dataloader_mosaic()
-                #         self.train_loader.reset()
 
                 if RANK in {-1, 0}:
                     LOGGER.info(self.progress_string())
@@ -590,6 +631,7 @@ class BaseTrainer:
 
                 #Training loop
                 for i, batch in pbar:
+                    start_batch_forward_time = time.time()
                     self.run_callbacks("on_train_batch_start")
                     # Warmup
                     ni = i + nb * epoch
@@ -614,22 +656,31 @@ class BaseTrainer:
                         self.tloss = (
                             (self.tloss * i + self.loss_items) / (i + 1) if self.tloss is not None else self.loss_items
                         )
+                        duration = round(self.model.end_batch_forward_time - start_batch_forward_time, 2)
+                        self.log_to_csv('./log/log_time.csv', {
+                            'layer_id': self.layer_id,
+                            'client_id': self.client_id,
+                            'epoch': epoch+1,
+                            'forward/backward/end_epoch': 'forward',
+                            'duration': round(duration, 2)
+                        })
                     
                     # Backward
+                    start_batch_backward_time = time.time()
                     self.scaler.scale(self.loss).backward()
                     if self.layer_id == 2:
                         if hasattr(self.model, 'saved_tensor'):
-                            gradient_store = {}  # Dictionary để lưu gradient
+                            gradient_store = {}
                             for tensor_id, tensor in self.model.saved_tensor.items():
                                 if tensor.grad is not None:
-                                    print(f"Gradient shape của tensor {tensor_id}: {tensor.grad.shape}")  # [batch_size, 32, 160, 160]
+                                    print(f"Gradient shape của tensor {tensor_id}: {tensor.grad.shape}")
                                     gradient_store[tensor_id] = tensor.grad
                                 else:
                                     print(f"Gradient của tensor {tensor_id} là None")
                             
-                            # Gửi gradient qua queue
+                            # Send gradients to gradient_queue
                             if gradient_store:
-                                data_id = uuid.uuid4()
+                                data_id = self.model.input_data_id
                                 success = self.send_gradient(data_id, gradient_store)
                                 if not success:
                                     print(f"Không thể gửi Gradients {i} tới Gradient_queue.")
@@ -640,7 +691,6 @@ class BaseTrainer:
                                     print(f"Gradient shape của tensor {tensor_id} (data_store): {tensor.grad.shape}")
                                 else:
                                     print(f"Gradient của tensor {tensor_id} (data_store) là None")
-                    print("Chạy tới BACKWARD")
 
                     # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
                     if ni - last_opt_step >= self.accumulate:
@@ -656,8 +706,18 @@ class BaseTrainer:
                                 self.stop = broadcast_list[0]
                             if self.stop:  # training time exceeded
                                 break
-                    print("Chạy tới trước LOG")
                     
+                    # Log time
+                        end_batch_backward_time = time.time()
+                        duration = round(end_batch_backward_time - start_batch_backward_time, 2)
+                        self.log_to_csv('./log/log_time.csv', {
+                            'layer_id': self.layer_id,
+                            'client_id': self.client_id,
+                            'epoch': epoch+1,
+                            'forward/backward/end_epoch': 'backward',
+                            'duration': round(duration, 2)
+                        })
+
                     # Log
                     if RANK in {-1, 0}:
                         loss_length = self.tloss.shape[0] if len(self.tloss.shape) else 1
@@ -744,7 +804,7 @@ class BaseTrainer:
     def send_label(self, data_id, labels):
         queue_name = f'label_queue'
         self.channel.queue_declare(queue_name, durable=False)
-
+        # print("Label IDX: ", labels['cls'])
         message = pickle.dumps(
             {"data_id": data_id,
             "label": labels}
@@ -756,15 +816,18 @@ class BaseTrainer:
             body=message
         )
 
-        print(f"Batch {data_id} đã được gửi tới {queue_name}")
+        print(f"Batch {data_id} đã được gửi tới {queue_name}, Kích thước: {len(message)} bytes")
         return True
     
-    def send_number_batch(self, nb = None):
-        queue_name = f'label_queue'
+    def send_number_batch_client_id(self, nb = None, client_id = None, client_cut_layer = None, tensor_send_ids = None):
+        queue_name = f'number_batch_queue'
         self.channel.queue_declare(queue_name, durable=False)
 
         message = pickle.dumps(
-            {"nb": nb}
+            {"nb": nb,
+             "client_id": client_id,
+             "client_cut_layer": client_cut_layer,
+             "tensor_send_ids": tensor_send_ids}
         )
 
         self.channel.basic_publish(
@@ -775,18 +838,31 @@ class BaseTrainer:
         print(f"Number batch đã được gửi tới {queue_name}")
         return True
     
-    def wait_for_number_batch(self):
-        while True:
-            queue_name = f'label_queue'
+    def wait_for_number_batch_client_id(self):
+        expected_messages = self.num_client[0]
+        total_nb = 0
+        received = 0
+        while received < expected_messages:
+            queue_name = f'number_batch_queue'
             method_frame, header_frame, body = self.channel.basic_get(queue=queue_name, auto_ack=True)
             if method_frame and body:
                 received_data = pickle.loads(body)
+                print("Received data:", received_data)
                 nb = received_data["nb"]
-                return nb
+                client_id = received_data["client_id"]
+                client_cut_layer = received_data["client_cut_layer"]
+                tensor_send_ids = received_data["tensor_send_ids"]
+                if nb is not None and client_id is not None:
+                    total_nb += nb
+                    self.client_ids.append(client_id) 
+                    self.cut_layer_ids.append(client_cut_layer) 
+                    self.tensor_send_ids.append(tensor_send_ids) 
+                    received += 1
             else:
-                # print("No data received yet, waiting...")
-                time.sleep(1)
-
+                time.sleep(0.5)
+        self.channel.queue_delete(queue=queue_name)
+        return total_nb
+    
     def wait_for_batch(self):
         while True:
             queue_name = f'label_queue'
@@ -802,7 +878,10 @@ class BaseTrainer:
                 time.sleep(1)
 
     def send_gradient(self, data_id, gradients):
-        queue_name = f'gradient_queue_{self.layer_id - 1}'
+        # queue_name = f'gradient_queue_{self.layer_id - 1}'
+        client_id = data_id.split("_")[0]
+        queue_name = f'gradient_queue_{client_id}'
+
         self.channel.queue_declare(queue_name, durable=False)
 
         message = pickle.dumps(
@@ -816,7 +895,7 @@ class BaseTrainer:
             body=message
         )
 
-        print(f"Gradients {data_id} đã được gửi tới {queue_name}")
+        print(f"Gradients {data_id} đã được gửi tới {queue_name}, Kích thước: {len(message)} bytes")
         return True
 
     def wait_gradient(self):
@@ -863,12 +942,13 @@ class BaseTrainer:
         parameters = pika.ConnectionParameters(host=self.address, credentials=credentials)
         thread_connection = pika.BlockingConnection(parameters)
         thread_channel = thread_connection.channel()
-        queue_name = f'gradient_queue_{self.layer_id}'
+        queue_name = f'gradient_queue_{self.client_id}'
         while self.model.is_training:
             try:
                 if thread_channel is not None and thread_channel.is_open:
                     method_frame, header_frame, body = thread_channel.basic_get(queue=queue_name, auto_ack=True)
                     if method_frame and body:
+                        start_batch_backward_time = time.time()
                         received_data = pickle.loads(body)
                         data_id = received_data.get('data_id')
                         print("\nDATA_ID backward: ", data_id)
@@ -887,12 +967,33 @@ class BaseTrainer:
                             print(f"Received gradient for tensor_id {tensor_id}, shape: {grad.shape}")
                             gradient_dict[tensor_id] = grad
 
-                            # Backward
-                            tensor_list = [self.model.data_store[t_id] for t_id in gradient_dict.keys()]
-                            grad_list = [gradient_dict[t_id] for t_id in gradient_dict.keys()]
-                            torch.autograd.backward(tensor_list, grad_list)
+                        # Backward
+                        tensor_list = [self.model.data_store[t_id] for t_id in gradient_dict.keys()]
+                        grad_list = [gradient_dict[t_id] for t_id in gradient_dict.keys()]
+                        torch.autograd.backward(tensor_list, grad_list)
                         self.count_batch += 1
-                        # print(f"Xong 01 Backward cho {data_id} nè!!!!!!!!!!!!!!!!!!")
+
+                        # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
+                        self.optimizer_step()
+                        if self.args.time:
+                            self.stop = (time.time() - self.train_time_start) > (self.args.time * 3600)
+                            if RANK != -1:  # if DDP training
+                                broadcast_list = [self.stop if RANK == 0 else None]
+                                dist.broadcast_object_list(broadcast_list, 0)  # broadcast 'stop' to all ranks
+                                self.stop = broadcast_list[0]
+                            if self.stop:  # training time exceeded
+                                break
+
+                        # Log
+                        end_batch_backward_time = time.time()
+                        duration = round(end_batch_backward_time - start_batch_backward_time, 2)
+                        self.log_to_csv('./log/log_time.csv', {
+                            'layer_id': self.layer_id,
+                            'client_id': self.client_id,
+                            'epoch': self.epoch + 1,
+                            'forward/backward/end_epoch': 'backward',
+                            'duration': round(duration, 2)
+                        })
                 else:
                     print("Thread channel is None or closed")
             except Exception as e:
@@ -902,6 +1003,7 @@ class BaseTrainer:
 
         thread_channel.close()
         thread_connection.close()
+
     def wait_all_backward(self, expected_num):
         with self.condition:
             while self.count_batch < expected_num:
@@ -913,49 +1015,65 @@ class BaseTrainer:
 
 
     def get_tensor_send_id (self, cut_layer):
+        tensor_send_id = []
+        mf_values = []
+        layer_indices = []
+        for idx, m in enumerate(self.model.model):
+            f = m.f
+            if f != -1:
+                if isinstance(f, int):
+                    f = [f]
+                for fi in f:
+                    if fi != -1:
+                        layer_indices.append(idx)
+                        mf_values.append(fi)
+        mf_values_sorted = sorted(mf_values)
+
+        for value in mf_values_sorted:
+            if value < cut_layer:
+                tensor_send_id.append(value)
+
+        indices_to_mf = dict(zip(layer_indices, mf_values))
+        for idx, val in indices_to_mf.items():
+            if idx <=cut_layer:
+                tensor_send_id.remove(val)
+
+        tensor_send_id.append(cut_layer)
+        print ("SEND tensor id: ", tensor_send_id)
+        return tensor_send_id
+
+    def init_csv(self, csv_file, headers):
         """
-        Trả về tập hợp các ID của các lớp mà mô hình sẽ gửi tensor tới hàng đợi.
+        Init csv log file
         """
-        if cut_layer <=3:
-            return [cut_layer]
-        elif cut_layer == 4:
-            return [cut_layer]
-        elif cut_layer == 5:
-            return [4, cut_layer]
-        elif cut_layer == 6:
-            return [4, cut_layer]
-        elif cut_layer == 7:
-            return [4, 6, cut_layer]
-        elif cut_layer == 8:
-            return [4, 6, cut_layer]
-        elif cut_layer == 9:
-            return [4, 6, cut_layer]
-        elif cut_layer == 10:
-            return [4, 6, cut_layer]
-        elif cut_layer == 11:
-            return [4, 6, 10, cut_layer]
-        elif cut_layer == 12:
-            return [4, 10, cut_layer]
-        elif cut_layer == 13:
-            return [4, 10, cut_layer]
-        elif cut_layer == 14:
-            return [4, 10, 13,cut_layer]
-        elif cut_layer == 15:
-            return [10, 13, cut_layer]
-        elif cut_layer == 16:
-            return [10, 13, cut_layer]
-        elif cut_layer == 17:
-            return [10, 13, 16, cut_layer]
-        elif cut_layer == 18:
-            return [10, 16, cut_layer]
-        elif cut_layer == 19:
-            return [10, 16, cut_layer]
-        elif cut_layer == 20:
-            return [10, 16, 19, cut_layer]
-        elif cut_layer == 21:
-            return [16, 19, cut_layer]
-        elif cut_layer == 22:
-            return [16, 19, cut_layer]
+        df = pd.DataFrame(columns=headers)
+        df.to_csv(csv_file, index=False)
+    
+    def log_to_csv(self, csv_file, data_dict):
+        """
+        Log to csv file
+        """
+        df = pd.DataFrame([data_dict])
+        df.to_csv(csv_file, mode='a', header=not os.path.exists(csv_file), index=False)
+
+    def send_epoch_intermediate(self, epoch_intermediate_path = None):
+        queue_name = f'Server_queue'
+        self.channel.queue_declare(queue_name, durable=False)
+        epoch_intermediate_path = str(epoch_intermediate_path).replace("F:\\Do_an\\split_learning", "/app").replace("\\", "/")
+        message = pickle.dumps(
+            {"action": "VAL_INTER",
+             "client_id": self.client_id,
+             "layer_id": self.layer_id,
+             "epoch": self.epoch,
+             "epoch_intermediate": epoch_intermediate_path}
+        )
+
+        self.channel.basic_publish(
+            exchange='',
+            routing_key=queue_name,
+            body=message
+        )
+        print(f"Epoch intermediate path đã được gửi tới {queue_name}")
 
     def auto_batch(self, max_num_obj=0):
         """Calculate optimal batch size based on model and device memory constraints."""
@@ -1058,8 +1176,10 @@ class BaseTrainer:
         self.last.write_bytes(serialized_ckpt)  # save last.pt
         if self.best_fitness == self.fitness:
             self.best.write_bytes(serialized_ckpt)  # save best.pt
-        if (self.save_period > 0) and (self.epoch % self.save_period == 0):
+        if (self.save_period > 0) and (self.epoch % self.save_period == 0) and self.validate_intermediate == True:
             (self.wdir / f"epoch{self.epoch}.pt").write_bytes(serialized_ckpt)  # save epoch, i.e. 'epoch3.pt'
+            model_path = self.wdir / f"epoch{self.epoch}.pt"
+            self.send_epoch_intermediate(model_path)
         # if self.args.close_mosaic and self.epoch == (self.epochs - self.args.close_mosaic - 1):
         #    (self.wdir / "last_mosaic.pt").write_bytes(serialized_ckpt)  # save mosaic checkpoint
 

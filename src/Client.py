@@ -12,7 +12,7 @@ import src.Log
 import src.Model
 
 class Client:
-    def __init__(self, client_id, layer_id, address, username, password, train_func, device):
+    def __init__(self, client_id, layer_id, address, username, password, train_func, device, virtual_machine=False):
         self.client_id = client_id
         self.layer_id = layer_id
         self.address = address
@@ -20,6 +20,7 @@ class Client:
         self.password = password
         self.device = device
         self.train_func = train_func
+        self.virtual_machine = virtual_machine
         print(f"Client {self.client_id} initialized with layer {self.layer_id} on device {self.device}")
         self.connect()
     
@@ -48,6 +49,10 @@ class Client:
                 break
             time.sleep(0.5)
 
+    def read_file(self, file_path):
+        with open(file_path, "rb") as file:
+            return file.read()
+
     def response_message(self, body):
         self.response = pickle.loads(body)
         action = self.response["action"]
@@ -56,17 +61,23 @@ class Client:
         cut_layer = self.response.get("cut_layer")
         epochs = self.response.get("epochs")
         batch_size = self.response.get("batch_size")
-        # src.Log.print_with_color(f"[<<<] Client received: {self.response}", "blue")
+        num_client = self.response.get("num_client")
+
         if action == "START":
             src.Log.print_with_color(f"[<<<] Client received: {self.response}", "blue")
             if self.layer_id == 1:
-                result, best = self.train_func(model_path, dataset_path, cut_layer, epochs, batch_size, self.address, self.username, self.password)
-
+                result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, epochs, batch_size, self.address, self.username, self.password)
             if self.layer_id == 2:
-                result, best = self.train_func(model_path, dataset_path, cut_layer, epochs, batch_size, self.address, self.username, self.password)
+                result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, epochs, batch_size, self.address, self.username, self.password)
             
-            data = {"action": "UPDATE", "client_id": self.client_id, "layer_id": self.layer_id,
-                    "result": result, "message": "Sent parameters to Server", "best": best}
+            if self.virtual_machine:
+                file_data = self.read_file(best)
+                data = {"action": "UPDATE", "client_id": self.client_id, "layer_id": self.layer_id,
+                        "result": result, "message": "Sent parameters to Server", "vm": self.virtual_machine, "best": file_data}
+            else:
+                best = str(best).replace("F:\\Do_an\\split_learning", "/app").replace("\\", "/")
+                data = {"action": "UPDATE", "client_id": self.client_id, "layer_id": self.layer_id,
+                        "result": result, "message": "Sent parameters to Server", "vm": self.virtual_machine, "best": best}
             
             src.Log.print_with_color("[>>>] Client sent parameters to server", "red")
             self.send_to_server(data)

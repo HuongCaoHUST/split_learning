@@ -13,6 +13,7 @@ import uuid
 import pika
 import pickle
 import time
+import threading
 from ultralytics.nn.autobackend import check_class_names
 from ultralytics.nn.modules import (
     AIFI,
@@ -175,11 +176,10 @@ class BaseModel(torch.nn.Module):
         embed = frozenset(embed) if embed is not None else {-1}
         max_idx = max(embed)
         data_store = {}
-        start_layer = self.cut_layer + 1
-        start_idx = start_layer if self.is_training and self.layer_id == 2 else 0
-        max_retries = 200
-        retry_delay = 1
+        start_layer = self.cut_layer + 1 if self.is_training and self.layer_id == 2 else 0
 
+        max_retries = 1000
+        retry_delay = 1
         if self.is_training and self.layer_id == 2:
             queue_name = f'intermediate_queue_{self.layer_id - 1}'
             for attempt in range(max_retries):
@@ -188,9 +188,19 @@ class BaseModel(torch.nn.Module):
                     try:
                         received_data = pickle.loads(body)
                         data_store = received_data.get('data_store', {})
-                        if not any(tid in data_store for tid in self.tensor_send_ids):
+                        self.input_data_id = received_data.get('data_id', 'unknown')
+                        client_id = self.input_data_id.split("_")[0]
+
+                        if client_id in self.client_ids:
+                            index = self.client_ids.index(client_id)
+                            start_layer = self.cut_layer_ids[index] + 1
+                            selected_tensor_id = self.tensor_send_ids[index]
+
+                        print("Start layer: ", start_layer)
+                        print("Selectes_tensor_id: ", selected_tensor_id)
+                        if not any(tid in data_store for tid in selected_tensor_id):
                             raise ValueError("Layer 2 output not found in data_store")
-                        tensor_id = next(iter(self.tensor_send_ids))
+                        tensor_id = next(iter(selected_tensor_id))
                         x = data_store[tensor_id]
                         if not isinstance(x, torch.Tensor):
                             raise ValueError("Data from queue is not a valid tensor")
@@ -200,20 +210,20 @@ class BaseModel(torch.nn.Module):
                         y = [None] * len(self.model)
 
                         # Vòng lặp gán Tensor
-                        for tensor_id in self.tensor_send_ids:
+                        for tensor_id in selected_tensor_id:
                             if tensor_id not in data_store:
                                 raise ValueError(f"Expected tensor_id {tensor_id} not found in data_store")
                             x = data_store[tensor_id]
                             if not isinstance(x, torch.Tensor):
                                 raise ValueError(f"Data for tensor_id {tensor_id} is not a valid tensor")
-                            # print(f"Received tensor_id {tensor_id}, shape: {x.shape}")
+                            print(f"Received tensor_id {tensor_id}, shape: {x.shape}")
 
                             x.requires_grad_(True)
                             x.retain_grad()
                             self.saved_tensor[tensor_id] = x
                             y[tensor_id] = x
                         
-                        print(f"Received TENSOR data_id: {received_data.get('data_id', 'unknown')}")
+                        print(f"Received TENSOR data_id: {self.input_data_id}")
                         break
                     except (pickle.UnpicklingError, ValueError) as e:
                         print(f"Error processing queue data: {e}")
@@ -229,7 +239,7 @@ class BaseModel(torch.nn.Module):
         else:
             y = [None] * len(self.model)
             
-        for m in self.model[start_idx:]:
+        for m in self.model[start_layer:]:
             if m.i == self.cut_layer + 1  and self.layer_id == 1:
                 # print(f"Cut layer {m.i} reached, stopping forward pass.")
                 break
@@ -261,33 +271,13 @@ class BaseModel(torch.nn.Module):
 
         if self.is_training and self.layer_id == 1:
             self.data_store = data_store
-            data_id = uuid.uuid4()
+            data_id = f"{self.client_id}_{uuid.uuid4()}"
             success = self.send_to_intermediate_queue(data_id, data_store)
             if not success:
                 print(f"Không thể gửi data_store tới intermediate_queue.")
+
+        self.end_batch_forward_time = time.time()
         return x
-    
-    def connect_rabbitmq(self):
-        """
-        Thiết lập kết nối tới RabbitMQ và trả về kênh (channel) để sử dụng.
-        """
-        try:
-            credentials = pika.PlainCredentials(self.username, self.password)
-            parameters = pika.ConnectionParameters(
-                host=self.address,
-                port=5672,
-                virtual_host='/',
-                credentials=credentials
-            )
-            
-            connection = pika.BlockingConnection(parameters)
-            
-            channel = connection.channel()
-            print("Kết nối tới RabbitMQ thành công!")
-            return channel
-        except Exception as e:
-            print(f"Lỗi kết nối tới RabbitMQ: {e}")
-            return None
 
     def send_to_intermediate_queue(self, data_id, data_store):
         queue_name = f'intermediate_queue_{self.layer_id}'
@@ -304,17 +294,13 @@ class BaseModel(torch.nn.Module):
             body=message
         )
 
-        print(f"Data_store {data_id} đã được gửi tới {queue_name}")
+        print(f"Data_store {data_id} đã được gửi tới {queue_name}, Kích thước: {len(message)} bytes")
         return True
     
     def get_tensor_send_id (self, cut_layer):
-        """
-        Trả về tập hợp các ID của các lớp mà mô hình sẽ gửi tensor tới hàng đợi.
-        """
         tensor_send_id = []
         mf_values = []
         layer_indices = []
-        print("--- CÁC TENSOR ĐẶC BIỆT ---")
         for idx, m in enumerate(self.model):
             f = m.f
             if f != -1:
@@ -338,47 +324,34 @@ class BaseModel(torch.nn.Module):
         tensor_send_id.append(cut_layer)
         print ("SEND tensor id: ", tensor_send_id)
         return tensor_send_id
-                
-        # if cut_layer <=3:
-        #     return [cut_layer]
-        # elif cut_layer == 4:
-        #     return [cut_layer]
-        # elif cut_layer == 5:
-        #     return [4, cut_layer]
-        # elif cut_layer == 6:
-        #     return [4, cut_layer]
-        # elif cut_layer == 7:
-        #     return [4, 6, cut_layer]
-        # elif cut_layer == 8:
-        #     return [4, 6, cut_layer]
-        # elif cut_layer == 9:
-        #     return [4, 6, cut_layer]
-        # elif cut_layer == 10:
-        #     return [4, 6, cut_layer]
-        # elif cut_layer == 11:
-        #     return [4, 6, 10, cut_layer]
-        # elif cut_layer == 12:
-        #     return [4, 10, cut_layer]
-        # elif cut_layer == 13:
-        #     return [4, 10, cut_layer]
-        # elif cut_layer == 14:
-        #     return [4, 10, 13, cut_layer]
-        # elif cut_layer == 15:
-        #     return [10, 13, cut_layer]
-        # elif cut_layer == 16:
-        #     return [10, 13, cut_layer]
-        # elif cut_layer == 17:
-        #     return [10, 13, 16, cut_layer]
-        # elif cut_layer == 18:
-        #     return [10, 16, cut_layer]
-        # elif cut_layer == 19:
-        #     return [10, 16, cut_layer]
-        # elif cut_layer == 20:
-        #     return [10, 16, 19, cut_layer]
-        # elif cut_layer == 21:
-        #     return [16, 19, cut_layer]
-        # elif cut_layer == 22:
-        #     return [16, 19, cut_layer]
+    
+    
+    def start_thread(self, forward_queue):
+        """START THREADING"""
+        thread = threading.Thread(target=self.check_foward, args= (forward_queue,), daemon=True)
+        thread.start()
+
+    def stop_thread(self):
+        """STOP THREADING"""
+        self.model.is_training = False
+        print(f"Thread đã dừng.")
+
+    def check_foward(self, forward_queue):
+        queue_name = f'intermediate_queue_{self.layer_id - 1}'
+        while True:
+            try:
+                if self.channel is not None and self.channel.is_open:
+                    method_frame, header_frame, body = self.channel.basic_get(queue=queue_name, auto_ack=True)
+                    if method_frame and body:
+                        received_data = pickle.loads(body)
+                        data_id = received_data.get('data_id', {})
+                        print("DATA_ID: ", data_id)
+                else:
+                    print("Thread channel is None or closed")
+            except Exception as e:
+                print("Error in check_forward thread:", e)
+                break
+            time.sleep(0.2)
 
     def _predict_augment(self, x):
         """Perform augmentations on input image x and return augmented inference."""
@@ -565,7 +538,7 @@ class DetectionModel(BaseModel):
     """
 
     def __init__(self, cfg="yolo11n.yaml", ch=3, nc=None, verbose=True,
-                 layer_id=None, client_id = None, cut_layer = None,
+                 layer_id=None, client_id = None, num_client = None, cut_layer = None,
                  address = None, username = None, password = None ,channel = None):
         """
         Initialize the YOLO detection model with the given config and parameters.
@@ -597,15 +570,19 @@ class DetectionModel(BaseModel):
 
         self.client_id = client_id
         self.layer_id = layer_id
-        self.cut_layer = cut_layer
+        self.num_client = num_client
+        self.cut_layer = cut_layer if self.layer_id == 1 else cut_layer[0]
+        self.cut_layer_ids = None
         self.address = address
         self.username = username
         self.password = password
         self.is_training = False
-        self.tensor_send_ids = self.get_tensor_send_id (self.cut_layer)
+        self.client_ids = None
+        self.tensor_send_ids = self.get_tensor_send_id(self.cut_layer) if self.layer_id == 1 else []
         self.data_store=None
         self.channel = None
-        print(f"Client ID in TASK: {self.client_id}, Layer ID: {self.layer_id}", "Cut Layer:", self.cut_layer)
+        self.input_data_id = None
+        print(f"Client ID in TASK: {self.client_id}, Layer ID: {self.layer_id}", "Num_client: ", self.num_client,"Cut Layer:", self.cut_layer)
         print(f"Thông tin RABBITMQ: {self.address}, username: {self.username}, password: {self.password}")
         # Build strides
         m = self.model[-1]  # Detect()
