@@ -203,6 +203,7 @@ class BaseTrainer:
         if self.layer_id == 1:
             self.condition = threading.Condition()
 
+        self.validate_intermediate = True  # validate intermediate epochs
 
     def connect_rabbitmq(self):
         try:
@@ -559,6 +560,7 @@ class BaseTrainer:
                             
                     self.run_callbacks("on_train_batch_end")
                 self.wait_all_backward(expected_num=nb)
+
                 self.lr = {f"lr/pg{ir}": x["lr"] for ir, x in enumerate(self.optimizer.param_groups)}  # for loggers
 
                 end_epoch_time = time.time()
@@ -1001,6 +1003,7 @@ class BaseTrainer:
 
         thread_channel.close()
         thread_connection.close()
+
     def wait_all_backward(self, expected_num):
         with self.condition:
             while self.count_batch < expected_num:
@@ -1052,6 +1055,25 @@ class BaseTrainer:
         """
         df = pd.DataFrame([data_dict])
         df.to_csv(csv_file, mode='a', header=not os.path.exists(csv_file), index=False)
+
+    def send_epoch_intermediate(self, epoch_intermediate_path = None):
+        queue_name = f'Server_queue'
+        self.channel.queue_declare(queue_name, durable=False)
+        epoch_intermediate_path = str(epoch_intermediate_path).replace("F:\\Do_an\\split_learning", "/app").replace("\\", "/")
+        message = pickle.dumps(
+            {"action": "VAL_INTER",
+             "client_id": self.client_id,
+             "layer_id": self.layer_id,
+             "epoch": self.epoch,
+             "epoch_intermediate": epoch_intermediate_path}
+        )
+
+        self.channel.basic_publish(
+            exchange='',
+            routing_key=queue_name,
+            body=message
+        )
+        print(f"Epoch intermediate path đã được gửi tới {queue_name}")
 
     def auto_batch(self, max_num_obj=0):
         """Calculate optimal batch size based on model and device memory constraints."""
@@ -1154,8 +1176,10 @@ class BaseTrainer:
         self.last.write_bytes(serialized_ckpt)  # save last.pt
         if self.best_fitness == self.fitness:
             self.best.write_bytes(serialized_ckpt)  # save best.pt
-        if (self.save_period > 0) and (self.epoch % self.save_period == 0):
+        if (self.save_period > 0) and (self.epoch % self.save_period == 0) and self.validate_intermediate == True:
             (self.wdir / f"epoch{self.epoch}.pt").write_bytes(serialized_ckpt)  # save epoch, i.e. 'epoch3.pt'
+            model_path = self.wdir / f"epoch{self.epoch}.pt"
+            self.send_epoch_intermediate(model_path)
         # if self.args.close_mosaic and self.epoch == (self.epochs - self.args.close_mosaic - 1):
         #    (self.wdir / "last_mosaic.pt").write_bytes(serialized_ckpt)  # save mosaic checkpoint
 

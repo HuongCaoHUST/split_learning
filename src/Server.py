@@ -88,6 +88,8 @@ class Server:
         self.output_model = config["model"]["output_model"]
         self.best_model_layer_1 = []
         self.best_model_2 = None
+        self.epoch_model_layer_1 = []
+        self.epoch_model_layer_2 = []
 
         #Dataset
         self.dataset_path = config["dataset"]["dataset_path"]
@@ -162,6 +164,16 @@ class Server:
                         "parameters": None}
             self.send_to_client(client_id, pickle.dumps(response))
 
+        elif action == "VAL_INTER":
+            src.Log.print_with_color(f"[<<<] Received message from client: {message}", "blue")
+            client_id = message["client_id"]
+            layer_id = message["layer_id"]
+            layer_map = {
+                1: self.epoch_model_layer_1,
+                2: self.epoch_model_layer_2
+            }
+            if layer_id in layer_map:
+                layer_map[layer_id].append(message["epoch_intermediate"])
          
         elif action == "UPDATE":
             client_id = message["client_id"]
@@ -182,12 +194,8 @@ class Server:
                 src.Log.print_with_color(f"[<<<] Received best model from client: {best}", "blue")
                 self.best_model_2 = best
                 print("BEST_2.pt:", self.best_model_2)
-
-                print("Best model layer 1 full: ", self.best_model_layer_1)
-                merge_model = self.merge_yolo_models()
-                args = dict(model=merge_model, data=self.dataset_path[0])
-                validator = DetectionValidator(args=args)
-                validator()
+                self.validate_epoch_model()
+                self.validate_best_model()
                 sys.exit()
 
         # Ack the message
@@ -263,6 +271,30 @@ class Server:
             body=message
         )
     
+    def validate_best_model(self):
+        print("Best model layer 1 full: ", self.best_model_layer_1)
+        merge_model = self.merge_yolo_models()
+        args = dict(model=merge_model, data=self.dataset_path[0])
+        validator = DetectionValidator(args=args)
+        validator()
+        return True
+    
+    def validate_epoch_model(self):
+        epoch = 0
+        for val1, val2 in zip(self.epoch_model_layer_1, self.epoch_model_layer_2):
+            print("Epoch model layer 1: ", val1)
+            print("Epoch model layer 2: ", val2)
+            merge_model = self.merge_yolo_epoch_models(val1, val2)
+            args = dict(model=merge_model, data=self.dataset_path[0])
+            validator = DetectionValidator(args=args)
+            results = validator()
+            epoch += 1
+            print(f"Epoch {epoch}: precision={results['metrics/precision(B)']:.4f}, "
+              f"recall={results['metrics/recall(B)']:.4f}, "
+              f"mAP50={results['metrics/mAP50(B)']:.4f}, "
+              f"mAP50-95={results['metrics/mAP50-95(B)']:.4f}")
+        return True
+
     def merge_yolo_models(self):
         output_path = self.output_model
         print("Total client: ", self.total_clients)
@@ -433,3 +465,31 @@ class Server:
 
             print(f"Đã ghép xong model và lưu tại: {output_path}")
             return output_path
+        
+    def merge_yolo_epoch_models(self, model1_path = None, model2_path = None):
+        output_path = self.output_model
+        print("EPOCH MODEL")
+        model1 = YOLO(model1_path)
+        model2 = YOLO(model2_path)
+        output_path = self.output_model
+
+        state_dict1 = model1.model.state_dict()
+        state_dict2 = model2.model.state_dict()
+
+        new_state_dict = state_dict2.copy()
+
+        for k in state_dict1.keys():
+            if k.startswith("model."):
+                try:
+                    layer_num = int(k.split('.')[1])
+                    if layer_num <= self.cut_layer:
+                        new_state_dict[k] = state_dict1[k]
+                except:
+                    pass
+
+        model2.model.load_state_dict(new_state_dict)
+
+        model2.save(output_path)
+
+        print(f"Đã ghép xong model và lưu tại: {output_path}")
+        return output_path
