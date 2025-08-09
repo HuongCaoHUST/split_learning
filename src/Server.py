@@ -116,6 +116,7 @@ class Server:
         self.channel.basic_consume(queue='Server_queue', on_message_callback=self.on_request)
         self.logger = src.Log.Logger(f"{log_path}/app.log")
         self.logger.log_info("Start Training")
+        src.Utils.init_csv(f"{log_path}/log/log_validation.csv", headers=["epoch", "precision", "recall", "mAP50", "mAP50-95"])
 
         src.Log.print_with_color(f"Server is waiting for {self.total_clients} clients.", "green")
 
@@ -293,6 +294,13 @@ class Server:
               f"recall={results['metrics/recall(B)']:.4f}, "
               f"mAP50={results['metrics/mAP50(B)']:.4f}, "
               f"mAP50-95={results['metrics/mAP50-95(B)']:.4f}")
+            src.Utils.log_to_csv(f"./log/log_validation.csv", {
+                "epoch": epoch,
+                "precision": results['metrics/precision(B)'],
+                "recall": results['metrics/recall(B)'],
+                "mAP50": results['metrics/mAP50(B)'],
+                "mAP50-95": results['metrics/mAP50-95(B)']
+            })
         return True
 
     def merge_yolo_models(self):
@@ -467,11 +475,10 @@ class Server:
             return output_path
         
     def merge_yolo_epoch_models(self, model1_path = None, model2_path = None):
-        output_path = self.output_model
-        print("EPOCH MODEL")
+        output_path = './merged_epoch_model.pt'
+        print("MERGE_EPOCH_MODEL")
         model1 = YOLO(model1_path)
         model2 = YOLO(model2_path)
-        output_path = self.output_model
 
         state_dict1 = model1.model.state_dict()
         state_dict2 = model2.model.state_dict()
