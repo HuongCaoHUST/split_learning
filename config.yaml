@@ -15,16 +15,13 @@ model:
   model_path: ./yolo11n.pt
   cut_layer: 
     - 10
-    - 10
-    - 10
-
   hybrid_training: False
+  valid_epoch_model: True
   output_model: ./merged_model.pt
 
 dataset:
   dataset_path:
     - ./datasets/livingroom_2.yaml
-
   concatenate_datasets: False
 
 log_path: .

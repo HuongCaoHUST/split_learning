@@ -32,14 +32,14 @@ class Trainning:
                                    routing_key='Server_queue',
                                    body=pickle.dumps(message))
 
-    def train_on_first_layer(self, model_path, dataset_path, num_client, cut_layer, epochs, batch_size, address = None, username = None, password = None):
+    def train_on_first_layer(self, model_path, dataset_path, num_client, cut_layer, epochs, batch_size, address = None, username = None, password = None, valid_epoch_model = -1):
         src.Log.print_with_color("--- START TRAINING FIRST LAYER ---", "green")
         args = dict(model=model_path,
                     data=dataset_path,
                     num_client=num_client,
                     epochs=epochs,
                     batch=batch_size,
-                    save_period = 1,
+                    save_period = valid_epoch_model,
                     client_id=self.client_id,
                     layer_id=self.layer_id,
                     cut_layer=cut_layer,
@@ -67,7 +67,7 @@ class Trainning:
                 break
             time.sleep(0.5)
 
-    def train_on_last_layer(self, model_path, dataset_path, num_client, cut_layer, epochs, batch_size, address = None, username = None, password = None):
+    def train_on_last_layer(self, model_path, dataset_path, num_client, cut_layer, epochs, batch_size, address = None, username = None, password = None, valid_epoch_model = -1):
         queue_name = f'label_queue'
         result = True
         self.channel.queue_declare(queue=queue_name, durable=False)
@@ -81,7 +81,7 @@ class Trainning:
                     num_client=num_client,
                     epochs=epochs,
                     batch=batch_size,
-                    save_period = 1,
+                    save_period = valid_epoch_model,
                     # optimizer='AdamW',
                     client_id=self.client_id,
                     close_mosaic = 5,
@@ -112,7 +112,7 @@ class Trainning:
                 break
             time.sleep(0.5)
                     
-    def train_on_device(self, model_path, dataset_path, num_client,cut_layer, epochs, batch_size, address, username, password):
+    def train_on_device(self, model_path, dataset_path, num_client,cut_layer, epochs, batch_size, address, username, password, valid_epoch_model):
         self.data_count = 0
         if self.layer_id == 1:
 
@@ -121,7 +121,7 @@ class Trainning:
             self.channel.queue_declare(queue=forward_queue_name, durable=False)
             self.channel.basic_qos(prefetch_count=10)
 
-            result = self.train_on_first_layer(model_path, dataset_path, num_client,cut_layer, epochs, batch_size, address, username, password)
+            result = self.train_on_first_layer(model_path, dataset_path, num_client,cut_layer, epochs, batch_size, address, username, password, valid_epoch_model)
 
         elif self.layer_id == 2:
             # Create intermediate queue
@@ -134,7 +134,7 @@ class Trainning:
             self.channel.queue_declare(queue=forward_queue_name, durable=False)
             self.channel.basic_qos(prefetch_count=10)
             
-            result = self.train_on_last_layer(model_path, dataset_path, num_client,cut_layer, epochs, batch_size, address, username, password)
+            result = self.train_on_last_layer(model_path, dataset_path, num_client,cut_layer, epochs, batch_size, address, username, password, valid_epoch_model)
 
         if self.event_time:
             src.Log.print_with_color(f"Training time events {self.time_event}", "yellow")

@@ -84,6 +84,8 @@ class Server:
         # Model
         self.model_path = config["model"]["model_path"]
         self.cut_layer = config["model"]["cut_layer"]
+        self.valid_epoch_model = 1 if config["model"]["valid_epoch_model"] else -1
+        print (f"Valid epoch model: {self.valid_epoch_model}")
         self.hybrid_training = config["model"]["hybrid_training"]
         self.output_model = config["model"]["output_model"]
         self.best_model_layer_1 = []
@@ -229,7 +231,6 @@ class Server:
         src.Log.print_with_color(f"notify_client", "red")
         print("self.list_client: ", self.list_clients)
         self.layer1_clients = [(client_id, layer_id) for client_id, layer_id in self.list_clients if layer_id == 1]
-
         print("layer1_client: ", self.layer1_clients)
 
         dataset_index = 0
@@ -242,7 +243,8 @@ class Server:
                             "epochs": self.epochs,
                             "batch_size": self.batch_size,
                             "lr": self.lr,
-                            "momentum": self.momentum}
+                            "momentum": self.momentum,
+                            "valid_epoch_model": self.valid_epoch_model}
                 
                 if layer_id == 1:
                     response["cut_layer"] = self.cut_layer[dataset_index]
@@ -254,7 +256,7 @@ class Server:
                     dataset_index += 1
                 elif layer_id == 2:
                     response["cut_layer"] = self.cut_layer
-                    response["dataset_path"] = "/app/datasets/livingroom_4_1.yaml"
+                    response["dataset_path"] = self.dataset_path[0]
 
             self.time_start = time.time_ns()
             src.Log.print_with_color(f"[>>>] Sent start training request to client {client_id}", "red")
