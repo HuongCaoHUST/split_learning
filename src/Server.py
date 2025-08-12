@@ -197,7 +197,6 @@ class Server:
                 src.Log.print_with_color(f"[<<<] Received best model from client: {best}", "blue")
                 self.best_model_2 = best
                 print("BEST_2.pt:", self.best_model_2)
-                self.validate_epoch_model()
                 self.validate_best_model()
                 sys.exit()
 
@@ -277,7 +276,7 @@ class Server:
     def validate_best_model(self):
         print("Best model layer 1 full: ", self.best_model_layer_1)
         merge_model = self.merge_yolo_models()
-        args = dict(model=merge_model, data=self.dataset_path[0])
+        args = dict(model=merge_model, data=self.dataset_path[0], project = './runs/detect',)
         validator = DetectionValidator(args=args)
         validator()
         return True

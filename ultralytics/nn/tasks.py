@@ -539,7 +539,7 @@ class DetectionModel(BaseModel):
 
     def __init__(self, cfg="yolo11n.yaml", ch=3, nc=None, verbose=True,
                  layer_id=None, client_id = None, num_client = None, cut_layer = None,
-                 address = None, username = None, password = None ,channel = None):
+                 address = None, username = None, password = None):
         """
         Initialize the YOLO detection model with the given config and parameters.
 

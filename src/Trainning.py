@@ -39,14 +39,14 @@ class Trainning:
                     num_client=num_client,
                     epochs=epochs,
                     batch=batch_size,
+                    project = './runs/detect',
                     save_period = valid_epoch_model,
                     client_id=self.client_id,
                     layer_id=self.layer_id,
                     cut_layer=cut_layer,
                     address=address,
                     username=username,
-                    password=password,
-                    channel=self.channel)
+                    password=password)
         trainer = DetectionTrainer(overrides=args)
         trainer.train()
         self.best_model = trainer.best
@@ -81,6 +81,7 @@ class Trainning:
                     num_client=num_client,
                     epochs=epochs,
                     batch=batch_size,
+                    project = './runs/detect',
                     save_period = valid_epoch_model,
                     # optimizer='AdamW',
                     client_id=self.client_id,
@@ -89,8 +90,7 @@ class Trainning:
                     cut_layer=cut_layer,
                     address=address,
                     username=username,
-                    password=password,
-                    channel=self.channel)
+                    password=password)
         trainer = DetectionTrainer(overrides=args)
         trainer.train()
         self.best_model = trainer.best

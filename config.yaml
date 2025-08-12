@@ -16,19 +16,19 @@ model:
   cut_layer: 
     - 10
   hybrid_training: False
-  valid_epoch_model: True
+  valid_epoch_model: False
   output_model: ./merged_model.pt
 
 dataset:
   dataset_path:
-    - ./datasets/livingroom_2.yaml
+    - ./datasets/livingroom_4_1.yaml
   concatenate_datasets: False
 
 log_path: .
 
 learning:
   learning-rate: 0.0001
-  epochs: 2
+  epochs: 1
   momentum: 0.5
   batch-size: 16
   control-count: 3
