@@ -188,7 +188,7 @@ class Server:
                 print("BEST_layer_1.pt:", best)
             elif layer_id == 1 and virtual_machine:
                 best = message["best"]
-                best = self.save_model_file(best, best_dir="./best_model_vm")
+                best = src.Utils.save_model_file(best, best_dir="./best_model_vm")
                 src.Log.print_with_color(f"[<<<] Received best model from client: {best}", "blue")
                 self.best_model_layer_1.append(best)
             
@@ -202,28 +202,6 @@ class Server:
 
         # Ack the message
         ch.basic_ack(delivery_tag=method.delivery_tag)
-
-    def save_model_file(self, best_model, best_dir="./best_model_vm"):
-        save_dir = os.path.abspath(best_dir)
-        os.makedirs(save_dir, exist_ok=True)
-        existing_files = [f for f in os.listdir(save_dir) if f.startswith("best_") and f.endswith(".pt")]
-        indices = []
-
-        for f in existing_files:
-            try:
-                index = int(f.replace("best_", "").replace(".pt", ""))
-                indices.append(index)
-            except ValueError:
-                pass
-
-        next_index = max(indices, default=0) + 1
-        filename = f"best_{next_index}.pt"
-        file_path = os.path.join(save_dir, filename)
-
-        with open(file_path, "wb") as f:
-            f.write(best_model)
-
-        return file_path
 
     def notify_to_clients(self, start=True, register=True):
 

@@ -656,14 +656,15 @@ class BaseTrainer:
                         self.tloss = (
                             (self.tloss * i + self.loss_items) / (i + 1) if self.tloss is not None else self.loss_items
                         )
-                        duration = round(self.model.end_batch_forward_time - start_batch_forward_time, 2)
-                        self.log_to_csv('./log/log_time.csv', {
-                            'layer_id': self.layer_id,
-                            'client_id': self.client_id,
-                            'epoch': epoch+1,
-                            'forward/backward/end_epoch': 'forward',
-                            'duration': round(duration, 2)
-                        })
+
+                    duration = round(self.model.end_batch_forward_time - start_batch_forward_time, 2)
+                    self.log_to_csv('./log/log_time.csv', {
+                        'layer_id': self.layer_id,
+                        'client_id': self.client_id,
+                        'epoch': epoch+1,
+                        'forward/backward/end_epoch': 'forward',
+                        'duration': round(duration, 2)
+                    })
                     
                     # Backward
                     start_batch_backward_time = time.time()
@@ -708,15 +709,15 @@ class BaseTrainer:
                                 break
                     
                     # Log time
-                        end_batch_backward_time = time.time()
-                        duration = round(end_batch_backward_time - start_batch_backward_time, 2)
-                        self.log_to_csv('./log/log_time.csv', {
-                            'layer_id': self.layer_id,
-                            'client_id': self.client_id,
-                            'epoch': epoch+1,
-                            'forward/backward/end_epoch': 'backward',
-                            'duration': round(duration, 2)
-                        })
+                    end_batch_backward_time = time.time()
+                    duration = round(end_batch_backward_time - start_batch_backward_time, 2)
+                    self.log_to_csv('./log/log_time.csv', {
+                        'layer_id': self.layer_id,
+                        'client_id': self.client_id,
+                        'epoch': epoch+1,
+                        'forward/backward/end_epoch': 'backward',
+                        'duration': round(duration, 2)
+                    })
 
                     # Log
                     if RANK in {-1, 0}:
