@@ -665,10 +665,27 @@ class BaseTrainer:
                         'forward/backward/end_epoch': 'forward',
                         'duration': round(duration, 2)
                     })
-                    
                     # Backward
                     start_batch_backward_time = time.time()
                     self.scaler.scale(self.loss).backward()
+                    print("self.amp: ", self.amp)
+                    print("self.scaler2: ", self.scaler)
+
+                    # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
+                    if ni - last_opt_step >= self.accumulate:
+                        self.optimizer_step()
+                        last_opt_step = ni
+
+                        # Timed stopping
+                        if self.args.time:
+                            self.stop = (time.time() - self.train_time_start) > (self.args.time * 3600)
+                            if RANK != -1:  # if DDP training
+                                broadcast_list = [self.stop if RANK == 0 else None]
+                                dist.broadcast_object_list(broadcast_list, 0)  # broadcast 'stop' to all ranks
+                                self.stop = broadcast_list[0]
+                            if self.stop:  # training time exceeded
+                                break
+
                     if self.layer_id == 2:
                         if hasattr(self.model, 'saved_tensor'):
                             gradient_store = {}
@@ -692,21 +709,6 @@ class BaseTrainer:
                                     print(f"Gradient shape của tensor {tensor_id} (data_store): {tensor.grad.shape}")
                                 else:
                                     print(f"Gradient của tensor {tensor_id} (data_store) là None")
-
-                    # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
-                    if ni - last_opt_step >= self.accumulate:
-                        self.optimizer_step()
-                        last_opt_step = ni
-
-                        # Timed stopping
-                        if self.args.time:
-                            self.stop = (time.time() - self.train_time_start) > (self.args.time * 3600)
-                            if RANK != -1:  # if DDP training
-                                broadcast_list = [self.stop if RANK == 0 else None]
-                                dist.broadcast_object_list(broadcast_list, 0)  # broadcast 'stop' to all ranks
-                                self.stop = broadcast_list[0]
-                            if self.stop:  # training time exceeded
-                                break
                     
                     # Log time
                     end_batch_backward_time = time.time()
@@ -784,7 +786,7 @@ class BaseTrainer:
             # Do final val with best.pt
             seconds = time.time() - self.train_time_start
             LOGGER.info(f"\n{epoch - self.start_epoch + 1} epochs completed in {seconds / 3600:.3f} hours.")
-            self.final_eval()
+            # self.final_eval()
             if self.args.plots and self.layer_id != 1:
                 self.plot_metrics()
             self.run_callbacks("on_train_end")
@@ -953,6 +955,8 @@ class BaseTrainer:
                         received_data = pickle.loads(body)
                         data_id = received_data.get('data_id')
                         print("\nDATA_ID backward: ", data_id)
+                        print("Self.amp: ",self.amp)
+                        print("Self.scaler: ", self.scaler)
                         gradient_store = received_data.get('gadients', {})
                         if not isinstance(gradient_store, dict):
                             raise ValueError("Received 'gadients' is not a valid dictionary")
@@ -975,7 +979,13 @@ class BaseTrainer:
                         self.count_batch += 1
 
                         # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
-                        self.optimizer_step()
+                        # self.optimizer_step()
+                        for g in self.optimizer.param_groups:
+                            for p in g['params']:
+                                if p.grad is not None:
+                                    p.grad.data = p.grad.data.float()  # đảm bảo FP32
+                        self.optimizer.step()
+                        self.optimizer.zero_grad()
                         if self.args.time:
                             self.stop = (time.time() - self.train_time_start) > (self.args.time * 3600)
                             if RANK != -1:  # if DDP training
