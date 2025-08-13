@@ -12,7 +12,7 @@ rabbit:
   password: password
 
 model:
-  model_path: ./yolo11n.pt
+  model_path: ./yolov11s.pt
   cut_layer: 
     - 10
   hybrid_training: False
@@ -21,7 +21,7 @@ model:
 
 dataset:
   dataset_path:
-    - ./datasets/livingroom_2.yaml
+    - ./datasets/livingroom_4_1.yaml
   concatenate_datasets: False
 
 log_path: .
