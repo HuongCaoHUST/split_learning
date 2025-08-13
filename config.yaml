@@ -21,7 +21,7 @@ model:
 
 dataset:
   dataset_path:
-    - ./datasets/livingroom_4_1.yaml
+    - ./datasets/livingroom_2.yaml
   concatenate_datasets: False
 
 log_path: .

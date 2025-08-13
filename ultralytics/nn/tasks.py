@@ -204,8 +204,7 @@ class BaseModel(torch.nn.Module):
                         x = data_store[tensor_id]
                         if not isinstance(x, torch.Tensor):
                             raise ValueError("Data from queue is not a valid tensor")
-                        x.requires_grad_(True)
-                        x.retain_grad()
+
                         self.saved_tensor = {}
                         y = [None] * len(self.model)
 
@@ -218,8 +217,7 @@ class BaseModel(torch.nn.Module):
                                 raise ValueError(f"Data for tensor_id {tensor_id} is not a valid tensor")
                             print(f"Received tensor_id {tensor_id}, shape: {x.shape}")
 
-                            x.requires_grad_(True)
-                            x.retain_grad()
+                            x = x.detach().clone().requires_grad_(True)
                             self.saved_tensor[tensor_id] = x
                             y[tensor_id] = x
                         
