@@ -36,3 +36,11 @@ def save_model_file(best_model, best_dir="./best_model_vm"):
             f.write(best_model)
 
         return file_path
+
+def distribution_batch(total_clients):
+        if total_clients[0] == total_clients[1]:
+            return 1
+        elif total_clients[0] > total_clients[1]:
+            return (total_clients[0]-total_clients[1])/total_clients[1]
+        elif total_clients[0] < total_clients[1]:
+            return total_clients[0]/total_clients[1]

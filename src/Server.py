@@ -210,6 +210,9 @@ class Server:
         self.layer1_clients = [(client_id, layer_id) for client_id, layer_id in self.list_clients if layer_id == 1]
         print("layer1_client: ", self.layer1_clients)
 
+        if self.total_clients[1] >=2:
+            dataset_ratio = src.Utils.distribution_batch(self.total_clients)
+            print("Dataset ratio: ", dataset_ratio)
         dataset_index = 0
         for (client_id, layer_id) in self.list_clients:
             if start:
@@ -224,7 +227,7 @@ class Server:
                             "valid_epoch_model": self.valid_epoch_model}
                 
                 if layer_id == 1:
-                    response["cut_layer"] = self.cut_layer[dataset_index]
+                    response["cut_layer"] = self.cut_layer[dataset_index] if self.hybrid_training else self.cut_layer[0]
                     response["dataset_path"] = self.dataset_path[dataset_index]
                     if self.concatenate_datasets and dataset_index !=0:
                         delta_nc = self.nc_list_cumulative[dataset_index - 1]
