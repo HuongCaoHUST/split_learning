@@ -1,5 +1,10 @@
 # Split Learning
-
+![Python](https://img.shields.io/badge/-Python-3776AB?style=flat&logo=python&logoColor=white)
+![PyTorch](https://img.shields.io/badge/-PyTorch-EE4C2C?style=flat&logo=pytorch&logoColor=white)
+![Ultralytics](https://img.shields.io/badge/-Ultralytics-3776AB?style=flat&logo=github&logoColor=white)
+![RabbitMQ](https://img.shields.io/badge/-RabbitMQ-FF6600?style=flat&logo=rabbitmq&logoColor=white)
+![Docker](https://img.shields.io/badge/-Docker-2496ED?style=flat&logo=docker&logoColor=white)
+![Docker Compose](https://img.shields.io/badge/-Docker%20Compose-2496ED?style=flat&logo=docker&logoColor=white)
 ## 📌 Giới thiệu
 Dự án này triển khai **Split Learning** để huấn luyện mô hình **YOLO11** trên nhiều máy khác nhau, kết nối thông qua **RabbitMQ**.  
 Mục tiêu:
@@ -8,7 +13,7 @@ Mục tiêu:
 - Tăng khả năng huấn luyện phân tán
 
 ## 🏗️ Kiến trúc hệ thống
-Hệ thống gồm 4 thành phần chính:
+Hệ thống gồm 3 thành phần chính:
 
 1. **Server**  
    - Quản lý luồng dữ liệu, điều phối quá trình huấn luyện  
@@ -25,22 +30,7 @@ Hệ thống gồm 4 thành phần chính:
    - Thực hiện **backward propagation** và gửi gradient ngược về Client 1a/1b
 
 ## 🔄 Luồng xử lý
-```
-Dữ liệu → Client 1a/1b → (Tensor) → Client 2 → (Loss & Backward) → Client 1a/1b
-```
-
-## 🛠️ Công nghệ sử dụng
-- **Ngôn ngữ:** Python 3.10+
-- **Framework:** [PyTorch](https://pytorch.org/), [Ultralytics YOLO](https://github.com/ultralytics/ultralytics)
-- **Message Broker:** [RabbitMQ](https://www.rabbitmq.com/)
-- **Docker** & **Docker Compose**
-
-## 📋 Yêu cầu
-- Docker và Docker Compose đã được cài đặt
-- Hoặc cài đặt thủ công Python và thư viện:
-```bash
-pip install torch ultralytics pika
-```
+![Architecture Diagram](images/architecture.svg)
 
 ## 🚀 Chạy với Docker Compose
 Tạo file `docker-compose.yml` như sau:
@@ -111,9 +101,25 @@ volumes:
   rabbitmq_data:
 ```
 
+### Dockerfile
+```bash
+FROM ultralytics/ultralytics:latest
+
+RUN pip install --upgrade pip
+
+RUN pip install \
+    requests==2.32.3 \
+    pika==1.3.2
+
+CMD ["bash"]
+
+ENV PYTHONUNBUFFERED=1
+```
+
 ### Chạy hệ thống
 ```bash
-docker-compose up --build
+docker compose build #build images
+docker compose up -d #run docker container
 ```
 
 ### Truy cập giao diện RabbitMQ Management
