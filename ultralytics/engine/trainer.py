@@ -671,21 +671,6 @@ class BaseTrainer:
                     print("self.amp: ", self.amp)
                     print("self.scaler2: ", self.scaler)
 
-                    # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
-                    if ni - last_opt_step >= self.accumulate:
-                        self.optimizer_step()
-                        last_opt_step = ni
-
-                        # Timed stopping
-                        if self.args.time:
-                            self.stop = (time.time() - self.train_time_start) > (self.args.time * 3600)
-                            if RANK != -1:  # if DDP training
-                                broadcast_list = [self.stop if RANK == 0 else None]
-                                dist.broadcast_object_list(broadcast_list, 0)  # broadcast 'stop' to all ranks
-                                self.stop = broadcast_list[0]
-                            if self.stop:  # training time exceeded
-                                break
-
                     if self.layer_id == 2:
                         if hasattr(self.model, 'saved_tensor'):
                             gradient_store = {}
@@ -709,6 +694,21 @@ class BaseTrainer:
                                     print(f"Gradient shape của tensor {tensor_id} (data_store): {tensor.grad.shape}")
                                 else:
                                     print(f"Gradient của tensor {tensor_id} (data_store) là None")
+                    
+                    # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
+                    if ni - last_opt_step >= self.accumulate:
+                        self.optimizer_step()
+                        last_opt_step = ni
+
+                        # Timed stopping
+                        if self.args.time:
+                            self.stop = (time.time() - self.train_time_start) > (self.args.time * 3600)
+                            if RANK != -1:  # if DDP training
+                                broadcast_list = [self.stop if RANK == 0 else None]
+                                dist.broadcast_object_list(broadcast_list, 0)  # broadcast 'stop' to all ranks
+                                self.stop = broadcast_list[0]
+                            if self.stop:  # training time exceeded
+                                break
                     
                     # Log time
                     end_batch_backward_time = time.time()
