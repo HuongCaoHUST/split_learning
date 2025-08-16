@@ -84,6 +84,8 @@ class Server:
         # Model
         self.model_path = config["model"]["model_path"]
         self.cut_layer = config["model"]["cut_layer"]
+        if len(self.total_clients) > len(self.cut_layer):
+            self.cut_layer = [self.cut_layer[0] for _ in range(len(self.total_clients))]
         self.valid_epoch_model = 1 if config["model"]["valid_epoch_model"] else -1
         self.hybrid_training = config["model"]["hybrid_training"]
         self.output_model = config["model"]["output_model"]
@@ -94,8 +96,10 @@ class Server:
 
         #Dataset
         self.dataset_path = config["dataset"]["dataset_path"]
+        if len(self.total_clients) > len(self.dataset_path):
+            self.dataset_path = [self.dataset_path[0] for _ in range(len(self.total_clients))]
+        print("Dataset path: ", self.dataset_path)
         self.nb_client = src.Utils.check_dataset(self.dataset_path, self.batch_size)
-        print("data_distribution: ", self.nb_client)
 
         self.concatenate_datasets = config["dataset"]["concatenate_datasets"]
         if self.concatenate_datasets == True and self.total_clients[0] >1:
