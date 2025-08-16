@@ -1,0 +1,241 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1125.46 649.85">
+  <defs>
+    <clipPath id="a">
+      <rect x="973.54" y="588.68" width="90.37" height="14.04" fill="none"/>
+    </clipPath>
+    <clipPath id="b">
+      <rect x="973.54" y="556.54" width="135.23" height="14.04" fill="none"/>
+    </clipPath>
+    <clipPath id="c">
+      <rect x="973.54" y="520.7" width="134.75" height="14.04" fill="none"/>
+    </clipPath>
+    <clipPath id="d">
+      <rect x="973.54" y="617.12" width="100.68" height="14.04" fill="none"/>
+    </clipPath>
+    <clipPath id="e">
+      <rect x="956.63" y="496.71" width="89.15" height="14.08" fill="none"/>
+    </clipPath>
+    <clipPath id="f">
+      <rect x="442.25" y="631.71" width="73.34" height="17.84" fill="none"/>
+    </clipPath>
+    <clipPath id="g">
+      <rect x="442.6" y="24.35" width="66.32" height="17.84" fill="none"/>
+    </clipPath>
+    <clipPath id="h">
+      <rect x="154.62" y="245.53" width="75.34" height="36.99" fill="none"/>
+    </clipPath>
+    <clipPath id="i">
+      <rect x="711.06" y="340.84" width="96.32" height="36.99" fill="none"/>
+    </clipPath>
+    <clipPath id="j">
+      <rect x="154.62" y="457.29" width="81" height="36.99" fill="none"/>
+    </clipPath>
+  </defs>
+  <g>
+    <g>
+      <rect x="876.95" y="481.13" width="248.51" height="165.65" fill="#68d7ff"/>
+      <line x1="888.85" y1="595.72" x2="952.09" y2="595.72" fill="none" stroke="#044aaf" stroke-linecap="round" stroke-miterlimit="10" stroke-width="5"/>
+      <polygon points="945.44 604.49 949.16 595.72 945.44 586.95 966.22 595.72 945.44 604.49" fill="#044aaf"/>
+      <g clip-path="url(#a)">
+        <text transform="translate(973.54 599.41)" font-size="12.63" fill="#2e2e30" font-family="Montserrat-Regular, Montserrat">: <tspan x="5.99" y="0" letter-spacing="-0.02em">F</tspan><tspan x="13.76" y="0">o</tspan><tspan x="21.68" y="0" letter-spacing="0.02em">r</tspan><tspan x="26.93" y="0" letter-spacing="-0.02em">w</tspan><tspan x="37.84" y="0">a</tspan><tspan x="45.29" y="0" letter-spacing="-0.01em">r</tspan><tspan x="50.21" y="0">d </tspan><tspan x="62.08" y="0" letter-spacing="0em">p</tspan><tspan x="70.6" y="0">ass</tspan></text>
+      </g>
+      <line x1="966.22" y1="563.58" x2="897.33" y2="563.58" fill="none" stroke="#fff" stroke-linecap="round" stroke-miterlimit="10" stroke-width="3" stroke-dasharray="16 16"/>
+      <polygon points="901.32 558.32 899.08 563.58 901.32 568.84 888.85 563.58 901.32 558.32" fill="#fff"/>
+      <g clip-path="url(#b)">
+        <text transform="translate(973.54 567.27)" font-size="12.63" fill="#2e2e30" font-family="Montserrat-Regular, Montserrat">: Client se<tspan x="60.27" y="0" letter-spacing="0em">n</tspan><tspan x="68.84" y="0">d </tspan><tspan x="80.71" y="0" letter-spacing="-0.02em">t</tspan><tspan x="85.61" y="0">o se</tspan><tspan x="110.64" y="0" letter-spacing="0.02em">r</tspan><tspan x="115.89" y="0" letter-spacing="-0.01em">v</tspan><tspan x="122.56" y="0">er</tspan></text>
+      </g>
+      <line x1="888.85" y1="527.74" x2="957.74" y2="527.74" fill="none" stroke="#fff" stroke-linecap="round" stroke-miterlimit="10" stroke-width="3"/>
+      <polygon points="953.75 533 955.99 527.74 953.75 522.48 966.22 527.74 953.75 533" fill="#fff"/>
+      <g clip-path="url(#c)">
+        <text transform="translate(973.54 531.44)" font-size="12.63" fill="#2e2e30" font-family="Montserrat-Regular, Montserrat">: Se<tspan x="21.38" y="0" letter-spacing="0.02em">r</tspan><tspan x="26.63" y="0" letter-spacing="-0.02em">v</tspan><tspan x="33.29" y="0">er se</tspan><tspan x="63.09" y="0" letter-spacing="0em">n</tspan><tspan x="71.66" y="0">d </tspan><tspan x="83.53" y="0" letter-spacing="-0.02em">t</tspan><tspan x="88.43" y="0">o </tspan><tspan x="99.65" y="0" letter-spacing="-0.01em">c</tspan><tspan x="106.67" y="0">lient</tspan></text>
+      </g>
+      <line x1="966.22" y1="624.16" x2="902.98" y2="624.16" fill="none" stroke="#e84f1a" stroke-linecap="round" stroke-miterlimit="10" stroke-width="5"/>
+      <polygon points="909.63 615.4 905.9 624.16 909.63 632.93 888.85 624.16 909.63 615.4" fill="#e84f1a"/>
+      <g clip-path="url(#d)">
+        <text transform="translate(973.54 627.86)" font-size="12.63" fill="#2e2e30" font-family="Montserrat-Regular, Montserrat">: B<tspan x="15.51" y="0" letter-spacing="0em">a</tspan><tspan x="22.97" y="0" letter-spacing="-0.01em">c</tspan><tspan x="29.99" y="0" letter-spacing="-0.03em">k</tspan><tspan x="37.24" y="0" letter-spacing="-0.02em">w</tspan><tspan x="48.14" y="0">a</tspan><tspan x="55.59" y="0" letter-spacing="-0.01em">r</tspan><tspan x="60.5" y="0" letter-spacing="0em">d </tspan><tspan x="72.37" y="0" letter-spacing="0em">p</tspan><tspan x="80.89" y="0">ass</tspan></text>
+      </g>
+      <g clip-path="url(#e)">
+        <text transform="translate(956.69 507.45)" font-size="12.63" fill="#2e2e30" font-family="Montserrat-SemiBold, Montserrat" font-weight="600">ANN<tspan x="29.49" y="0" letter-spacing="-0.01em">O</tspan><tspan x="39.54" y="0" letter-spacing="-0.03em">T</tspan><tspan x="46.7" y="0" letter-spacing="-0.04em">A</tspan><tspan x="55.84" y="0" letter-spacing="0em">TION</tspan></text>
+      </g>
+    </g>
+    <g>
+      <g>
+        <line x1="399.3" y1="264.74" x2="290.41" y2="264.74" fill="none" stroke="#044aaf" stroke-linecap="round" stroke-miterlimit="10" stroke-width="4"/>
+        <polygon points="395.34 258.93 417.02 264.74 395.34 270.55 395.34 258.93" fill="#044aaf"/>
+      </g>
+      <g>
+        <line x1="399.3" y1="472.44" x2="290.41" y2="472.44" fill="none" stroke="#044aaf" stroke-linecap="round" stroke-miterlimit="10" stroke-width="4"/>
+        <polygon points="395.34 466.63 417.02 472.44 395.34 478.25 395.34 466.63" fill="#044aaf"/>
+      </g>
+      <g>
+        <line x1="407.52" y1="449.07" x2="290.41" y2="264.74" fill="none" stroke="#044aaf" stroke-linecap="round" stroke-miterlimit="10" stroke-width="4"/>
+        <polygon points="410.3 442.61 417.02 464.03 400.49 448.84 410.3 442.61" fill="#044aaf"/>
+      </g>
+      <g>
+        <line x1="407.61" y1="285.32" x2="290.41" y2="472.44" fill="none" stroke="#044aaf" stroke-linecap="round" stroke-miterlimit="10" stroke-width="4"/>
+        <polygon points="400.58 285.59 417.02 270.3 410.43 291.76 400.58 285.59" fill="#044aaf"/>
+      </g>
+    </g>
+    <g>
+      <text transform="translate(379.66 512.43)" font-size="18" fill="#0998ea" font-family="Montserrat-Regular, Montserrat">in<tspan x="17.03" y="0" letter-spacing="-0.02em">t</tspan><tspan x="24.01" y="0">e</tspan><tspan x="34.88" y="0" letter-spacing="-0.01em">r</tspan><tspan x="41.96" y="0" letter-spacing="0em">m</tspan><tspan x="61.09" y="0" letter-spacing="0em">edia</tspan><tspan x="99.63" y="0" letter-spacing="-0.02em">t</tspan><tspan x="106.61" y="0">e_queue_1</tspan></text>
+      <path d="M431.1,442h87a2.3,2.3,0,0,1,2.31,2.3v44.93a2.3,2.3,0,0,1-2.31,2.3h-87" fill="none" stroke="#0998ea" stroke-linecap="round" stroke-miterlimit="10" stroke-width="3"/>
+      <path d="M512,487.58h-12.1a3.13,3.13,0,0,1-3.14-3.14V449.1a3.14,3.14,0,0,1,3.14-3.14H512a3.14,3.14,0,0,1,3.14,3.14v35.34a3.13,3.13,0,0,1-3.14,3.14" fill="#0998ea"/>
+      <path d="M489,487.58H476.9a3.13,3.13,0,0,1-3.14-3.14V449.1A3.14,3.14,0,0,1,476.9,446H489a3.15,3.15,0,0,1,3.14,3.14v35.34a3.14,3.14,0,0,1-3.14,3.14" fill="#0998ea"/>
+      <path d="M466,487.58H453.85a3.14,3.14,0,0,1-3.14-3.14V449.1a3.15,3.15,0,0,1,3.14-3.14H466a3.15,3.15,0,0,1,3.14,3.14v35.34a3.14,3.14,0,0,1-3.14,3.14" fill="#0998ea"/>
+    </g>
+    <text transform="translate(420.46 310.4)" font-size="18" fill="#0998ea" font-family="Montserrat-Regular, Montserrat">label_queue</text>
+    <g>
+      <path d="M431.1,240h87a2.31,2.31,0,0,1,2.31,2.31V287.2a2.31,2.31,0,0,1-2.31,2.31h-87" fill="none" stroke="#0998ea" stroke-linecap="round" stroke-miterlimit="10" stroke-width="3"/>
+      <path d="M512,285.55h-12.1a3.14,3.14,0,0,1-3.14-3.14V247.07a3.14,3.14,0,0,1,3.14-3.14H512a3.14,3.14,0,0,1,3.14,3.14v35.34a3.14,3.14,0,0,1-3.14,3.14" fill="#0998ea"/>
+      <path d="M489,285.55H476.9a3.14,3.14,0,0,1-3.14-3.14V247.07a3.14,3.14,0,0,1,3.14-3.14H489a3.15,3.15,0,0,1,3.14,3.14v35.34a3.15,3.15,0,0,1-3.14,3.14" fill="#0998ea"/>
+      <path d="M466,285.55H453.85a3.15,3.15,0,0,1-3.14-3.14V247.07a3.15,3.15,0,0,1,3.14-3.14H466a3.15,3.15,0,0,1,3.14,3.14v35.34a3.15,3.15,0,0,1-3.14,3.14" fill="#0998ea"/>
+    </g>
+    <g clip-path="url(#f)">
+      <text transform="translate(442.25 645.31)" font-size="16" fill="#2e2e30" font-family="Montserrat-SemiBold, Montserrat" font-weight="600"><tspan letter-spacing="-0.01em">C</tspan><tspan x="10.88" y="0">ut l</tspan><tspan x="37.12" y="0" letter-spacing="-0.01em">a</tspan><tspan x="46.5" y="0" letter-spacing="-0.01em">y</tspan><tspan x="55.29" y="0">er</tspan></text>
+    </g>
+    <g opacity="0.8">
+      <line x1="475.76" y1="134.66" x2="475.76" y2="228.3" fill="none" opacity="0.3" stroke-linecap="round" stroke-miterlimit="10" stroke-width="5" stroke-dasharray="14.48 14.48" stroke="#1b4c93"/>
+      <line x1="475.76" y1="550.07" x2="475.76" y2="617.92" fill="none" opacity="0.3" stroke-linecap="round" stroke-miterlimit="10" stroke-width="5" stroke-dasharray="14.48 14.48" stroke="#1b4c93"/>
+      <line x1="475.76" y1="328.71" x2="475.76" y2="434.67" fill="none" opacity="0.3" stroke-linecap="round" stroke-miterlimit="10" stroke-width="5" stroke-dasharray="14.48 14.48" stroke="#1b4c93"/>
+    </g>
+    <g>
+      <polyline points="392.06 33.27 46.2 33.27 46.2 165.96 80.89 165.96" fill="none" stroke="#fff" stroke-linecap="round" stroke-miterlimit="10" stroke-width="3"/>
+      <polygon points="77.92 170.31 94.18 165.96 77.92 161.6 77.92 170.31" fill="#fff"/>
+    </g>
+    <g>
+      <polyline points="378.77 86.23 1.5 86.23 1.5 473.25 94.18 473.25" fill="none" stroke="#fff" stroke-linecap="round" stroke-miterlimit="10" stroke-width="3" stroke-dasharray="16 16"/>
+      <polygon points="375.8 81.88 392.06 86.23 375.8 90.59 375.8 81.88" fill="#fff"/>
+    </g>
+    <g>
+      <polyline points="572.74 86.23 940.56 86.23 940.56 357.55 857.34 357.55" fill="none" stroke="#fff" stroke-linecap="round" stroke-miterlimit="10" stroke-width="3" stroke-dasharray="16 16"/>
+      <polygon points="575.72 90.59 559.45 86.23 575.72 81.88 575.72 90.59" fill="#fff"/>
+    </g>
+    <g>
+      <polyline points="559.45 33.27 905.32 33.27 905.32 277.09 870.63 277.09" fill="none" stroke="#fff" stroke-linecap="round" stroke-miterlimit="10" stroke-width="3"/>
+      <polygon points="873.6 272.73 857.34 277.09 873.6 281.45 873.6 272.73" fill="#fff"/>
+    </g>
+    <g>
+      <polyline points="46.2 146.46 46.2 570.4 72.06 570.28" fill="none" stroke="#fff" stroke-linecap="round" stroke-miterlimit="10" stroke-width="3"/>
+      <polygon points="69.11 574.66 85.35 570.23 69.07 565.94 69.11 574.66" fill="#fff"/>
+    </g>
+    <line x1="94.18" y1="261.09" x2="1.5" y2="261.09" fill="none" stroke="#fff" stroke-linecap="round" stroke-miterlimit="10" stroke-width="3" stroke-dasharray="16 16"/>
+    <g>
+      <path d="M392.06,11.34V55.21A11.34,11.34,0,0,0,403.4,66.55H548.12a11.34,11.34,0,0,0,11.33-11.34V11.34A11.34,11.34,0,0,0,548.12,0H403.4a11.34,11.34,0,0,0-11.34,11.34" fill="#abe5ff"/>
+      <g style="isolation: isolate">
+        <g clip-path="url(#g)">
+          <text transform="translate(442.6 37.95)" font-size="16" fill="#2e2e30" font-family="Montserrat-SemiBold, Montserrat" font-weight="600">SER<tspan x="32.46" y="0" letter-spacing="-0.01em">V</tspan><tspan x="43.7" y="0">ER</tspan></text>
+        </g>
+      </g>
+    </g>
+    <g>
+      <polyline points="536.9 264.74 577.5 264.74 577.5 353.98 643.39 353.98" fill="none" stroke="#044aaf" stroke-linecap="round" stroke-linejoin="round" stroke-width="4"/>
+      <polygon points="639.43 359.8 661.11 353.98 639.43 348.17 639.43 359.8" fill="#044aaf"/>
+    </g>
+    <g>
+      <polyline points="536.9 466.77 577.5 466.77 577.5 374.69 643.39 374.69" fill="none" stroke="#044aaf" stroke-linecap="round" stroke-linejoin="round" stroke-width="4"/>
+      <polygon points="639.43 380.5 661.11 374.69 639.43 368.88 639.43 380.5" fill="#044aaf"/>
+    </g>
+    <g>
+      <polyline points="661.11 328.71 599.01 328.71 599.01 209.7 308.13 209.7" fill="none" stroke="#e84f1a" stroke-linecap="round" stroke-linejoin="round" stroke-width="4"/>
+      <polygon points="312.09 203.89 290.41 209.7 312.09 215.51 312.09 203.89" fill="#e84f1a"/>
+    </g>
+    <g>
+      <polyline points="661.11 395.51 599.01 395.51 599.01 530.97 308.13 530.97" fill="none" stroke="#e84f1a" stroke-linecap="round" stroke-linejoin="round" stroke-width="4"/>
+      <polygon points="312.09 525.16 290.41 530.97 312.09 536.78 312.09 525.16" fill="#e84f1a"/>
+    </g>
+    <g>
+      <rect x="94.18" y="224.97" width="196.22" height="74.58" rx="7.28" fill="#abe5ff"/>
+      <rect x="94.18" y="185.63" width="196.22" height="39.34" rx="7.28" fill="#e84f1a"/>
+      <rect x="94.18" y="146.29" width="196.22" height="39.34" rx="7.28" fill="#0998ea"/>
+      <path d="M280.19,295H104.39a5.65,5.65,0,0,1-5.66-5.66V236.53a5.66,5.66,0,0,1,5.66-5.67h175.8a5.67,5.67,0,0,1,5.67,5.67v52.85a5.66,5.66,0,0,1-5.67,5.66" fill="#fff"/>
+      <g style="isolation: isolate">
+        <g clip-path="url(#h)">
+          <text transform="translate(157.9 259.12)" font-size="16" fill="#2e2e30" font-family="Montserrat-SemiBold, Montserrat" font-weight="600">Client 1a</text>
+          <text transform="translate(154.63 278.33)" font-size="16" fill="#2e2e30" font-family="Montserrat-Regular, Montserrat">id: c<tspan x="31.74" y="0" letter-spacing="0em">a</tspan><tspan x="41.2" y="0" letter-spacing="-0.03em">e</tspan><tspan x="50.42" y="0">1</tspan><tspan x="56.19" y="0" letter-spacing="0em">a</tspan><tspan x="65.65" y="0">e</tspan></text>
+        </g>
+      </g>
+      <g>
+        <g>
+          <polyline points="237.68 192.57 279.68 192.57 279.68 218.02 237.68 218.02" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/>
+          <rect x="267.59" y="196.75" width="8.75" height="17.08" rx="3.43" fill="#fff"/>
+          <rect x="256.38" y="196.75" width="8.75" height="17.08" rx="3.43" fill="#fff"/>
+          <rect x="245.16" y="196.75" width="8.75" height="17.08" rx="3.43" fill="#fff"/>
+        </g>
+        <text transform="translate(104.91 209.14)" font-size="13.13" fill="#fff" font-family="Montserrat-SemiBold, Montserrat" font-weight="600">g<tspan x="9.11" y="0" letter-spacing="-0.01em">r</tspan><tspan x="14.52" y="0" letter-spacing="0em">a</tspan><tspan x="22.52" y="0">dien</tspan><tspan x="52.5" y="0" letter-spacing="0.03em">t</tspan><tspan x="58.53" y="0" letter-spacing="-0.03em"> </tspan><tspan x="61.8" y="0">queu</tspan><tspan x="96.86" y="0" letter-spacing="-0.01em">e</tspan><tspan x="104.96" y="0" letter-spacing="-0.01em">_</tspan><tspan x="111.41" y="0">1a</tspan></text>
+      </g>
+      <g>
+        <g>
+          <polyline points="237.68 153.23 279.68 153.23 279.68 178.68 237.68 178.68" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/>
+          <rect x="267.59" y="157.41" width="8.75" height="17.08" rx="3.43" fill="#fff"/>
+          <rect x="256.38" y="157.41" width="8.75" height="17.08" rx="3.43" fill="#fff"/>
+          <rect x="245.16" y="157.41" width="8.75" height="17.08" rx="3.43" fill="#fff"/>
+        </g>
+        <text transform="translate(104.91 169.8)" font-size="13.13" fill="#fff" font-family="Montserrat-SemiBold, Montserrat" font-weight="600">reply_queue_1a</text>
+      </g>
+    </g>
+    <g>
+      <g>
+        <rect x="661.11" y="296.76" width="196.22" height="125.16" rx="7.28" fill="#abe5ff"/>
+        <path d="M847.12,417.42H671.32a5.67,5.67,0,0,1-5.67-5.67V308.32a5.67,5.67,0,0,1,5.67-5.67h175.8a5.67,5.67,0,0,1,5.67,5.67V411.75a5.67,5.67,0,0,1-5.67,5.67" fill="#fff"/>
+      </g>
+      <rect x="661.11" y="257.42" width="196.22" height="39.34" rx="7.28" fill="#0998ea"/>
+      <g style="isolation: isolate">
+        <g clip-path="url(#i)">
+          <text transform="translate(728.51 354.44)" font-size="16" fill="#2e2e30" font-family="Montserrat-SemiBold, Montserrat" font-weight="600">Client 2</text>
+          <text transform="translate(721.56 373.64)" font-size="16" fill="#2e2e30" font-family="Montserrat-Regular, Montserrat">id: e8<tspan x="42.61" y="0" letter-spacing="-0.02em">e</tspan><tspan x="51.97" y="0">386</tspan></text>
+        </g>
+      </g>
+      <g>
+        <g>
+          <polyline points="804.61 264.37 846.61 264.37 846.61 289.81 804.61 289.81" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/>
+          <rect x="834.52" y="268.55" width="8.75" height="17.08" rx="3.43" fill="#fff"/>
+          <rect x="823.31" y="268.55" width="8.75" height="17.08" rx="3.43" fill="#fff"/>
+          <rect x="812.09" y="268.55" width="8.75" height="17.08" rx="3.43" fill="#fff"/>
+        </g>
+        <text transform="translate(671.84 280.93)" font-size="13.13" fill="#fff" font-family="Montserrat-SemiBold, Montserrat" font-weight="600">reply_queue_2</text>
+      </g>
+    </g>
+    <g>
+      <rect x="94.18" y="436.73" width="196.22" height="74.58" rx="7.28" fill="#abe5ff"/>
+      <rect x="94.18" y="511.3" width="196.22" height="39.34" rx="7.28" fill="#e84f1a"/>
+      <rect x="94.18" y="550.64" width="196.22" height="39.34" rx="7.28" fill="#0998ea"/>
+      <path d="M280.19,506.8H104.39a5.65,5.65,0,0,1-5.66-5.66V448.29a5.66,5.66,0,0,1,5.66-5.67h175.8a5.67,5.67,0,0,1,5.67,5.67v52.85a5.66,5.66,0,0,1-5.67,5.66" fill="#fff"/>
+      <g style="isolation: isolate">
+        <g clip-path="url(#j)">
+          <text transform="translate(157.9 470.88)" font-size="16" fill="#2e2e30" font-family="Montserrat-SemiBold, Montserrat" font-weight="600">Client 1b</text>
+          <text transform="translate(154.63 490.08)" font-size="16" fill="#2e2e30" font-family="Montserrat-Regular, Montserrat">id: e56bee</text>
+        </g>
+      </g>
+      <g>
+        <g>
+          <polyline points="237.68 518.25 279.68 518.25 279.68 543.7 237.68 543.7" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/>
+          <rect x="267.59" y="522.43" width="8.75" height="17.08" rx="3.43" fill="#fff"/>
+          <rect x="256.38" y="522.43" width="8.75" height="17.08" rx="3.43" fill="#fff"/>
+          <rect x="245.16" y="522.43" width="8.75" height="17.08" rx="3.43" fill="#fff"/>
+        </g>
+        <text transform="translate(104.91 534.81)" font-size="13.13" fill="#fff" font-family="Montserrat-SemiBold, Montserrat" font-weight="600">g<tspan x="9.11" y="0" letter-spacing="-0.01em">r</tspan><tspan x="14.52" y="0" letter-spacing="0em">a</tspan><tspan x="22.52" y="0">dien</tspan><tspan x="52.5" y="0" letter-spacing="0.03em">t</tspan><tspan x="58.53" y="0" letter-spacing="-0.03em"> </tspan><tspan x="61.8" y="0">queu</tspan><tspan x="96.86" y="0" letter-spacing="-0.01em">e</tspan><tspan x="104.96" y="0" letter-spacing="-0.01em">_</tspan><tspan x="111.41" y="0">1b</tspan></text>
+      </g>
+      <g>
+        <g>
+          <polyline points="237.68 557.59 279.68 557.59 279.68 583.04 237.68 583.04" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/>
+          <rect x="267.59" y="561.77" width="8.75" height="17.08" rx="3.43" fill="#fff"/>
+          <rect x="256.38" y="561.77" width="8.75" height="17.08" rx="3.43" fill="#fff"/>
+          <rect x="245.16" y="561.77" width="8.75" height="17.08" rx="3.43" fill="#fff"/>
+        </g>
+        <text transform="translate(104.91 574.15)" font-size="13.13" fill="#fff" font-family="Montserrat-SemiBold, Montserrat" font-weight="600">reply_queue_1b</text>
+      </g>
+    </g>
+    <g>
+      <rect x="392.06" y="66.56" width="167.39" height="39.34" rx="7.28" fill="#ffb700"/>
+      <g>
+        <g>
+          <polyline points="507.27 73.51 549.27 73.51 549.27 98.96 507.27 98.96" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/>
+          <rect x="537.18" y="77.69" width="8.75" height="17.08" rx="3.43" fill="#fff"/>
+          <rect x="525.97" y="77.69" width="8.75" height="17.08" rx="3.43" fill="#fff"/>
+          <rect x="514.75" y="77.69" width="8.75" height="17.08" rx="3.43" fill="#fff"/>
+        </g>
+        <text transform="translate(398.24 90.08)" font-size="13.13" fill="#fff" font-family="Montserrat-SemiBold, Montserrat" font-weight="600">Server_queue</text>
+      </g>
+    </g>
+  </g>
+</svg>

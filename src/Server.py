@@ -84,6 +84,7 @@ class Server:
         # Model
         self.model_path = config["model"]["model_path"]
         self.cut_layer = config["model"]["cut_layer"]
+        self.valid_epoch_model = 1 if config["model"]["valid_epoch_model"] else -1
         self.hybrid_training = config["model"]["hybrid_training"]
         self.output_model = config["model"]["output_model"]
         self.best_model_layer_1 = []
@@ -93,19 +94,12 @@ class Server:
 
         #Dataset
         self.dataset_path = config["dataset"]["dataset_path"]
+        self.nb_client = src.Utils.check_dataset(self.dataset_path, self.batch_size)
+        print("data_distribution: ", self.nb_client)
+
         self.concatenate_datasets = config["dataset"]["concatenate_datasets"]
         if self.concatenate_datasets == True and self.total_clients[0] >1:
-            self.nc_list_cumulative = []
-            cumulative = 0
-            for i, path in enumerate(self.dataset_path):
-                if i == self.total_clients[0]:
-                    break
-                result = check_det_dataset(path)
-                nc = result['nc']
-                cumulative += nc
-                self.nc_list_cumulative.append(cumulative)
-
-            print ("CUMULATIVE: ", self.nc_list_cumulative)
+            self.concatenate_func()
 
         log_path = config["log_path"]
 
@@ -116,6 +110,7 @@ class Server:
         self.channel.basic_consume(queue='Server_queue', on_message_callback=self.on_request)
         self.logger = src.Log.Logger(f"{log_path}/app.log")
         self.logger.log_info("Start Training")
+        src.Utils.init_csv(f"{log_path}/log/log_validation.csv", headers=["epoch", "precision", "recall", "mAP50", "mAP50-95"])
 
         src.Log.print_with_color(f"Server is waiting for {self.total_clients} clients.", "green")
 
@@ -131,6 +126,18 @@ class Server:
     
     def start(self):
         self.channel.start_consuming()
+
+    def concatenate_func(self):
+        self.nc_list_cumulative = []
+        cumulative = 0
+        for i, path in enumerate(self.dataset_path):
+            if i == self.total_clients[0]:
+                break
+            result = check_det_dataset(path)
+            nc = result['nc']
+            cumulative += nc
+            self.nc_list_cumulative.append(cumulative)
+        print ("CUMULATIVE: ", self.nc_list_cumulative)
 
     def on_request(self, ch, method, props, body):
         message = pickle.loads(body)
@@ -185,7 +192,7 @@ class Server:
                 print("BEST_layer_1.pt:", best)
             elif layer_id == 1 and virtual_machine:
                 best = message["best"]
-                best = self.save_model_file(best, best_dir="./best_model_vm")
+                best = src.Utils.save_model_file(best, best_dir="./best_model_vm")
                 src.Log.print_with_color(f"[<<<] Received best model from client: {best}", "blue")
                 self.best_model_layer_1.append(best)
             
@@ -194,42 +201,24 @@ class Server:
                 src.Log.print_with_color(f"[<<<] Received best model from client: {best}", "blue")
                 self.best_model_2 = best
                 print("BEST_2.pt:", self.best_model_2)
-                self.validate_epoch_model()
                 self.validate_best_model()
                 sys.exit()
 
         # Ack the message
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
-    def save_model_file(self, best_model, best_dir="./best_model_vm"):
-        save_dir = os.path.abspath(best_dir)
-        os.makedirs(save_dir, exist_ok=True)
-        existing_files = [f for f in os.listdir(save_dir) if f.startswith("best_") and f.endswith(".pt")]
-        indices = []
-
-        for f in existing_files:
-            try:
-                index = int(f.replace("best_", "").replace(".pt", ""))
-                indices.append(index)
-            except ValueError:
-                pass
-
-        next_index = max(indices, default=0) + 1
-        filename = f"best_{next_index}.pt"
-        file_path = os.path.join(save_dir, filename)
-
-        with open(file_path, "wb") as f:
-            f.write(best_model)
-
-        return file_path
-
     def notify_to_clients(self, start=True, register=True):
 
         src.Log.print_with_color(f"notify_client", "red")
         print("self.list_client: ", self.list_clients)
         self.layer1_clients = [(client_id, layer_id) for client_id, layer_id in self.list_clients if layer_id == 1]
-
         print("layer1_client: ", self.layer1_clients)
+
+        self.layer1_clients_id = [client_id for client_id, layer_id in self.list_clients if layer_id == 1]
+        print("layer1_1_client: ", self.layer1_clients_id)
+
+        self.data_distribution = dict(zip(self.layer1_clients_id, self.nb_client))
+        print("data_distribution: ", self.data_distribution)
 
         dataset_index = 0
         for (client_id, layer_id) in self.list_clients:
@@ -241,7 +230,8 @@ class Server:
                             "epochs": self.epochs,
                             "batch_size": self.batch_size,
                             "lr": self.lr,
-                            "momentum": self.momentum}
+                            "momentum": self.momentum,
+                            "valid_epoch_model": self.valid_epoch_model}
                 
                 if layer_id == 1:
                     response["cut_layer"] = self.cut_layer[dataset_index]
@@ -253,7 +243,7 @@ class Server:
                     dataset_index += 1
                 elif layer_id == 2:
                     response["cut_layer"] = self.cut_layer
-                    response["dataset_path"] = "/app/datasets/livingroom_4_1.yaml"
+                    response["dataset_path"] = self.dataset_path[0]
 
             self.time_start = time.time_ns()
             src.Log.print_with_color(f"[>>>] Sent start training request to client {client_id}", "red")
@@ -274,7 +264,7 @@ class Server:
     def validate_best_model(self):
         print("Best model layer 1 full: ", self.best_model_layer_1)
         merge_model = self.merge_yolo_models()
-        args = dict(model=merge_model, data=self.dataset_path[0])
+        args = dict(model=merge_model, data=self.dataset_path[0], project = './runs/detect',)
         validator = DetectionValidator(args=args)
         validator()
         return True
@@ -293,6 +283,13 @@ class Server:
               f"recall={results['metrics/recall(B)']:.4f}, "
               f"mAP50={results['metrics/mAP50(B)']:.4f}, "
               f"mAP50-95={results['metrics/mAP50-95(B)']:.4f}")
+            src.Utils.log_to_csv(f"./log/log_validation.csv", {
+                "epoch": epoch,
+                "precision": results['metrics/precision(B)'],
+                "recall": results['metrics/recall(B)'],
+                "mAP50": results['metrics/mAP50(B)'],
+                "mAP50-95": results['metrics/mAP50-95(B)']
+            })
         return True
 
     def merge_yolo_models(self):
@@ -467,11 +464,10 @@ class Server:
             return output_path
         
     def merge_yolo_epoch_models(self, model1_path = None, model2_path = None):
-        output_path = self.output_model
-        print("EPOCH MODEL")
+        output_path = './merged_epoch_model.pt'
+        print("MERGE_EPOCH_MODEL")
         model1 = YOLO(model1_path)
         model2 = YOLO(model2_path)
-        output_path = self.output_model
 
         state_dict1 = model1.model.state_dict()
         state_dict2 = model2.model.state_dict()

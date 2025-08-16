@@ -2,9 +2,8 @@ name: Split Learning
 server:
   num-round: 1
   clients:
+    - 2
     - 1
-    - 1
-  model: YOLO11n
 
 rabbit:
   address: 172.18.0.2
@@ -16,17 +15,14 @@ model:
   cut_layer: 
     - 10
     - 10
-    - 10
-
   hybrid_training: False
+  valid_epoch_model: False
   output_model: ./merged_model.pt
 
 dataset:
   dataset_path:
     - ./datasets/livingroom_4_1.yaml
-    - ./datasets/livingroom_3_2.yaml
-    - ./datasets/livingroom_3_3.yaml
-
+    - ./datasets/livingroom_2.yaml
   concatenate_datasets: False
 
 log_path: .
