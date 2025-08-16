@@ -94,20 +94,12 @@ class Server:
 
         #Dataset
         self.dataset_path = config["dataset"]["dataset_path"]
-        src.Utils.check_dataset(self.dataset_path, self.batch_size)
+        self.nb_client = src.Utils.check_dataset(self.dataset_path, self.batch_size)
+        print("data_distribution: ", self.nb_client)
+
         self.concatenate_datasets = config["dataset"]["concatenate_datasets"]
         if self.concatenate_datasets == True and self.total_clients[0] >1:
-            self.nc_list_cumulative = []
-            cumulative = 0
-            for i, path in enumerate(self.dataset_path):
-                if i == self.total_clients[0]:
-                    break
-                result = check_det_dataset(path)
-                nc = result['nc']
-                cumulative += nc
-                self.nc_list_cumulative.append(cumulative)
-
-            print ("CUMULATIVE: ", self.nc_list_cumulative)
+            self.concatenate_func()
 
         log_path = config["log_path"]
 
@@ -134,6 +126,18 @@ class Server:
     
     def start(self):
         self.channel.start_consuming()
+
+    def concatenate_func(self):
+        self.nc_list_cumulative = []
+        cumulative = 0
+        for i, path in enumerate(self.dataset_path):
+            if i == self.total_clients[0]:
+                break
+            result = check_det_dataset(path)
+            nc = result['nc']
+            cumulative += nc
+            self.nc_list_cumulative.append(cumulative)
+        print ("CUMULATIVE: ", self.nc_list_cumulative)
 
     def on_request(self, ch, method, props, body):
         message = pickle.loads(body)
@@ -209,6 +213,12 @@ class Server:
         print("self.list_client: ", self.list_clients)
         self.layer1_clients = [(client_id, layer_id) for client_id, layer_id in self.list_clients if layer_id == 1]
         print("layer1_client: ", self.layer1_clients)
+
+        self.layer1_clients_id = [client_id for client_id, layer_id in self.list_clients if layer_id == 1]
+        print("layer1_1_client: ", self.layer1_clients_id)
+
+        self.data_distribution = dict(zip(self.layer1_clients_id, self.nb_client))
+        print("data_distribution: ", self.data_distribution)
 
         dataset_index = 0
         for (client_id, layer_id) in self.list_clients:

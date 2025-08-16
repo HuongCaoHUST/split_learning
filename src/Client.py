@@ -5,11 +5,8 @@ import random
 import torch
 import torchvision
 import torchvision.transforms as transforms
-
 from torch import nn
-
 import src.Log
-import src.Model
 
 class Client:
     def __init__(self, client_id, layer_id, address, username, password, train_func, device, virtual_machine=False):

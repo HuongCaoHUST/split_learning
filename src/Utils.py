@@ -43,6 +43,7 @@ def save_model_file(best_model, best_dir="./best_model_vm"):
         return file_path
 
 def check_dataset(dataset_paths, batch_size):
+    nb_distributed = []
     for dataset_path in dataset_paths:
         with open(dataset_path, "r") as f:
             data = yaml.safe_load(f)
@@ -51,12 +52,12 @@ def check_dataset(dataset_paths, batch_size):
         dataset_info = Path(raw_path).resolve()
         train_dataset = dataset_info / "train/images"
         if not train_dataset.exists():
-            print(f"⚠️ Thư mục {train_dataset} không tồn tại")
+            print(f"Thư mục {train_dataset} không tồn tại")
             continue
         image_files = [p for p in train_dataset.rglob("*") if p.suffix.lower() in IMG_FORMATS]
         nb = calculate_nb(len(image_files), batch_size)
-        print(f"Số lượng ảnh trong {train_dataset}: {len(image_files)}, số lượng batch: {nb}")
-    return True
+        nb_distributed.append(nb)
+    return nb_distributed
 
 def calculate_nb(number_images, batch_size):
     """
