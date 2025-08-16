@@ -1,5 +1,10 @@
 import os
 import pandas as pd
+import yaml
+from ultralytics.data.utils import check_cls_dataset
+from pathlib import Path
+
+IMG_FORMATS = {".bmp", ".dng", ".jpeg", ".jpg", ".mpo", ".png", ".tif", ".tiff", ".webp", ".pfm", ".heic"}  # image formats
 
 def init_csv(csv_file, headers):
         """
@@ -36,3 +41,25 @@ def save_model_file(best_model, best_dir="./best_model_vm"):
             f.write(best_model)
 
         return file_path
+
+def check_dataset(dataset_paths, batch_size):
+    for dataset_path in dataset_paths:
+        with open(dataset_path, "r") as f:
+            data = yaml.safe_load(f)
+
+        raw_path = data["path"]
+        dataset_info = Path(raw_path).resolve()
+        train_dataset = dataset_info / "train/images"
+        if not train_dataset.exists():
+            print(f"⚠️ Thư mục {train_dataset} không tồn tại")
+            continue
+        image_files = [p for p in train_dataset.rglob("*") if p.suffix.lower() in IMG_FORMATS]
+        nb = calculate_nb(len(image_files), batch_size)
+        print(f"Số lượng ảnh trong {train_dataset}: {len(image_files)}, số lượng batch: {nb}")
+    return True
+
+def calculate_nb(number_images, batch_size):
+    """
+    Calculate the number of batches
+    """
+    return (number_images // batch_size)

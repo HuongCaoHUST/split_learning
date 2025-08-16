@@ -85,7 +85,6 @@ class Server:
         self.model_path = config["model"]["model_path"]
         self.cut_layer = config["model"]["cut_layer"]
         self.valid_epoch_model = 1 if config["model"]["valid_epoch_model"] else -1
-        print (f"Valid epoch model: {self.valid_epoch_model}")
         self.hybrid_training = config["model"]["hybrid_training"]
         self.output_model = config["model"]["output_model"]
         self.best_model_layer_1 = []
@@ -95,6 +94,7 @@ class Server:
 
         #Dataset
         self.dataset_path = config["dataset"]["dataset_path"]
+        src.Utils.check_dataset(self.dataset_path, self.batch_size)
         self.concatenate_datasets = config["dataset"]["concatenate_datasets"]
         if self.concatenate_datasets == True and self.total_clients[0] >1:
             self.nc_list_cumulative = []
