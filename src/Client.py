@@ -2,9 +2,6 @@ import time
 import pickle
 import pika
 import random
-import torch
-import torchvision
-import torchvision.transforms as transforms
 from torch import nn
 import src.Log
 

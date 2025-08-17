@@ -5,17 +5,12 @@ import pickle
 import sys
 import yaml
 import numpy as np
-import torch
-import torch.nn as nn
 import requests
-from ultralytics.models.yolo.detect import DetectionValidator
 from ultralytics.data.utils import check_det_dataset
 from requests.auth import HTTPBasicAuth
-from ultralytics import YOLO
-import src.Model
 import src.Log
 import src.Utils
-import src.Validation
+from src.Validation import ModelValidator
 
 def delete_old_queues(address, username, password):
     url = f'http://{address}:15672/api/queues'
@@ -89,17 +84,23 @@ class Server:
         self.valid_epoch_model = 1 if config["model"]["valid_epoch_model"] else -1
         self.hybrid_training = config["model"]["hybrid_training"]
         self.output_model = config["model"]["output_model"]
-        self.best_model_layer_1 = []
-        self.best_model_2 = None
-        self.epoch_model_layer_1 = []
-        self.epoch_model_layer_2 = []
 
         #Dataset
         self.dataset_path = config["dataset"]["dataset_path"]
         if len(self.total_clients) > len(self.dataset_path):
             self.dataset_path = [self.dataset_path[0] for _ in range(len(self.total_clients))]
-        print("Dataset path: ", self.dataset_path)
         self.nb_client = src.Utils.check_dataset(self.dataset_path, self.batch_size)
+
+        self.val_function = ModelValidator(
+            total_client=self.total_clients,
+            hybrid_training=self.hybrid_training,
+            best_model_layer_1=[],
+            best_model_2=None,
+            epoch_model_layer_1=[],
+            epoch_model_layer_2=[],
+            dataset_path=self.dataset_path,
+            output_model=self.output_model
+        )
 
         self.concatenate_datasets = config["dataset"]["concatenate_datasets"]
         if self.concatenate_datasets == True and self.total_clients[0] >1:
@@ -117,6 +118,7 @@ class Server:
         src.Utils.init_csv(f"{log_path}/log/log_validation.csv", headers=["epoch", "precision", "recall", "mAP50", "mAP50-95"])
 
         src.Log.print_with_color(f"Server is waiting for {self.total_clients} clients.", "green")
+        
 
     def connect(self):
         credentials = pika.PlainCredentials(self.username, self.password)
@@ -180,8 +182,8 @@ class Server:
             client_id = message["client_id"]
             layer_id = message["layer_id"]
             layer_map = {
-                1: self.epoch_model_layer_1,
-                2: self.epoch_model_layer_2
+                1: self.val_function.epoch_model_layer_1,
+                2: self.val_function.epoch_model_layer_2
             }
             if layer_id in layer_map:
                 layer_map[layer_id].append(message["epoch_intermediate"])
@@ -192,20 +194,20 @@ class Server:
             if layer_id == 1 and not virtual_machine:
                 best = message["best"]
                 src.Log.print_with_color(f"[<<<] Received best model from client: {best}", "blue")
-                self.best_model_layer_1.append(best)
+                self.val_function.best_model_layer_1.append(best)
                 print("BEST_layer_1.pt:", best)
             elif layer_id == 1 and virtual_machine:
                 best = message["best"]
                 best = src.Utils.save_model_file(best, best_dir="./best_model_vm")
                 src.Log.print_with_color(f"[<<<] Received best model from client: {best}", "blue")
-                self.best_model_layer_1.append(best)
+                self.val_function.best_model_layer_1.append(best)
             
             elif layer_id == 2:
                 best = message["best"]
                 src.Log.print_with_color(f"[<<<] Received best model from client: {best}", "blue")
-                self.best_model_2 = best
-                print("BEST_2.pt:", self.best_model_2)
-                self.validate_best_model()
+                self.val_function.best_model_2 = best
+                print("BEST_2.pt:", self.val_function.best_model_2)
+                self.val_function.validate_best_model()
                 sys.exit()
 
         # Ack the message
@@ -264,232 +266,3 @@ class Server:
             routing_key=reply_queue_name,
             body=message
         )
-    
-    def validate_best_model(self):
-        print("Best model layer 1 full: ", self.best_model_layer_1)
-        merge_model = self.merge_yolo_models()
-        args = dict(model=merge_model, data=self.dataset_path[0], project = './runs/detect',)
-        validator = DetectionValidator(args=args)
-        validator()
-        return True
-    
-    def validate_epoch_model(self):
-        epoch = 0
-        for val1, val2 in zip(self.epoch_model_layer_1, self.epoch_model_layer_2):
-            print("Epoch model layer 1: ", val1)
-            print("Epoch model layer 2: ", val2)
-            merge_model = self.merge_yolo_epoch_models(val1, val2)
-            args = dict(model=merge_model, data=self.dataset_path[0])
-            validator = DetectionValidator(args=args)
-            results = validator()
-            epoch += 1
-            print(f"Epoch {epoch}: precision={results['metrics/precision(B)']:.4f}, "
-              f"recall={results['metrics/recall(B)']:.4f}, "
-              f"mAP50={results['metrics/mAP50(B)']:.4f}, "
-              f"mAP50-95={results['metrics/mAP50-95(B)']:.4f}")
-            src.Utils.log_to_csv(f"./log/log_validation.csv", {
-                "epoch": epoch,
-                "precision": results['metrics/precision(B)'],
-                "recall": results['metrics/recall(B)'],
-                "mAP50": results['metrics/mAP50(B)'],
-                "mAP50-95": results['metrics/mAP50-95(B)']
-            })
-        return True
-
-    def merge_yolo_models(self):
-        output_path = self.output_model
-        print("Total client: ", self.total_clients)
-        print("Hybrid_training: ", self.hybrid_training)
-        
-        if self.total_clients[0] == 1:
-            model1 = YOLO(self.best_model_layer_1[0])
-            model2 = YOLO(self.best_model_2)
-            output_path = self.output_model
-
-            state_dict1 = model1.model.state_dict()
-            state_dict2 = model2.model.state_dict()
-
-            new_state_dict = state_dict2.copy()
-
-            for k in state_dict1.keys():
-                if k.startswith("model."):
-                    try:
-                        layer_num = int(k.split('.')[1])
-                        if layer_num <= self.cut_layer:
-                            new_state_dict[k] = state_dict1[k]
-                    except:
-                        pass
-
-            model2.model.load_state_dict(new_state_dict)
-
-            model2.save(output_path)
-
-            print(f"Đã ghép xong model và lưu tại: {output_path}")
-            return output_path
-        elif self.total_clients[0] > 1 and self.hybrid_training == False:
-            state_dicts = []
-            for model_path in self.best_model_layer_1:
-                model = YOLO(model_path)
-                state_dicts.append(model.model.state_dict())
-            
-            # Average weights
-            avg_state_dict = {}
-            for key in state_dicts[0].keys():
-                if key.startswith("model."):
-                    try:
-                        layer_num = int(key.split('.')[1])
-                        if layer_num <= self.cut_layer:
-                            weights = [sd[key] for sd in state_dicts]
-                            avg_weight = sum(weights) / len(weights)
-                            avg_state_dict[key] = avg_weight
-                    except:
-                        pass
-
-            model2 = YOLO(self.best_model_2)
-            state_dict2 = model2.model.state_dict()
-            new_state_dict = state_dict2.copy()
-            new_state_dict.update(avg_state_dict)
-
-            model2.model.load_state_dict(new_state_dict)
-            model2.save(output_path)
-
-            print(f"Đã ghép xong model và lưu tại: {output_path}")
-            return output_path
-        
-        elif self.total_clients[0] > 1 and self.hybrid_training == True:
-            print("___HYBRID LEARNING___")
-            cut1 = self.cut_layer[0]
-            cut2 = self.cut_layer[1]
-            
-            cut_min = min(cut1, cut2)
-            cut_max = max(cut1, cut2)
-
-            # Load models tương ứng
-            model_1a = YOLO(self.best_model_layer_1[0])
-            model_1b = YOLO(self.best_model_layer_1[1])
-            model2 = YOLO(self.best_model_2)
-
-            state_1a = model_1a.model.state_dict()
-            state_1b = model_1b.model.state_dict()
-            state2  = model2.model.state_dict()
-
-            # Model đại diện vùng B (cut lớn hơn)
-            state_cut_high = state_1a if cut1 > cut2 else state_1b
-
-            avg_state_dict = {}
-
-            for key in state2.keys():
-                if key.startswith("model."):
-                    try:
-                        layer_num = int(key.split('.')[1])
-
-                        if layer_num <= cut_min:
-                            weights = [state_1a[key], state_1b[key]]
-                            avg_weight = sum(weights) / 2
-                            avg_state_dict[key] = avg_weight
-
-                        elif cut_min < layer_num <= cut_max:
-                            weights = [state_cut_high[key], state2[key]]
-                            avg_weight = sum(weights) / 2
-                            avg_state_dict[key] = avg_weight
-
-                        else:
-                            avg_state_dict[key] = state2[key]
-
-                    except:
-                        pass
-
-            new_state_dict = state2.copy()
-            new_state_dict.update(avg_state_dict)
-            model2.model.load_state_dict(new_state_dict)
-            model2.save(output_path)
-
-            print(f"Đã ghép xong model và lưu tại: {output_path}")
-            return output_path
-        elif self.total_clients[0] == 3 and self.hybrid_training == True:
-            print("___HYBRID LEARNING___")
-            cut1 = self.cut_layer[0]
-            cut2 = self.cut_layer[1]
-            cut3 = self.cut_layer[2]
-            
-            cuts = sorted([cut1, cut2, cut3])
-            cut_min = cuts[0]
-            cut_mid = cuts[1]
-            cut_max = cuts[2]
-
-            model_1a = YOLO(self.best_model_layer_1[0])
-            model_1b = YOLO(self.best_model_layer_1[1])
-            model_1c = YOLO(self.best_model_layer_1[2])
-            model2 = YOLO(self.best_model_2)
-
-            state_1a = model_1a.model.state_dict()
-            state_1b = model_1b.model.state_dict()
-            state_1c = model_1c.model.state_dict()
-            state2 = model2.model.state_dict()
-
-            state_cut_high = state_1a if cut1 == cut_max else (state_1b if cut2 == cut_max else state_1c)
-            state_cut_mid = state_1a if cut1 == cut_mid else (state_1b if cut2 == cut_mid else state_1c)
-            state_cut_low = state_1a if cut1 == cut_min else (state_1b if cut2 == cut_min else state_1c)
-
-            avg_state_dict = {}
-
-            for key in state2.keys():
-                if key.startswith("model."):
-                    try:
-                        layer_num = int(key.split('.')[1])
-
-                        if layer_num <= cut_min:
-                            weights = [state_1a[key], state_1b[key], state_1c[key]]
-                            avg_weight = sum(weights) / 3
-                            avg_state_dict[key] = avg_weight
-
-                        elif cut_min < layer_num <= cut_mid:
-                            weights = [state_cut_mid[key], state_cut_low[key], state2[key]]
-                            avg_weight = sum(weights) / 3
-                            avg_state_dict[key] = avg_weight
-
-                        elif cut_mid < layer_num <= cut_max:
-                            weights = [state_cut_high[key], state2[key]]
-                            avg_weight = sum(weights) / 2
-                            avg_state_dict[key] = avg_weight
-
-                        else:
-                            avg_state_dict[key] = state2[key]
-
-                    except:
-                        pass
-
-            new_state_dict = state2.copy()
-            new_state_dict.update(avg_state_dict)
-            model2.model.load_state_dict(new_state_dict)
-            model2.save(output_path)
-
-            print(f"Đã ghép xong model và lưu tại: {output_path}")
-            return output_path
-        
-    def merge_yolo_epoch_models(self, model1_path = None, model2_path = None):
-        output_path = './merged_epoch_model.pt'
-        print("MERGE_EPOCH_MODEL")
-        model1 = YOLO(model1_path)
-        model2 = YOLO(model2_path)
-
-        state_dict1 = model1.model.state_dict()
-        state_dict2 = model2.model.state_dict()
-
-        new_state_dict = state_dict2.copy()
-
-        for k in state_dict1.keys():
-            if k.startswith("model."):
-                try:
-                    layer_num = int(k.split('.')[1])
-                    if layer_num <= self.cut_layer:
-                        new_state_dict[k] = state_dict1[k]
-                except:
-                    pass
-
-        model2.model.load_state_dict(new_state_dict)
-
-        model2.save(output_path)
-
-        print(f"Đã ghép xong model và lưu tại: {output_path}")
-        return output_path

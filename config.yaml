@@ -2,7 +2,7 @@ name: Split Learning
 server:
   num-round: 1
   clients:
-    - 2
+    - 1
     - 1
 
 rabbit:
@@ -22,7 +22,6 @@ model:
 dataset:
   dataset_path:
     - ./datasets/livingroom_4_1.yaml
-    - ./datasets/livingroom_2.yaml
   concatenate_datasets: False
 
 log_path: .

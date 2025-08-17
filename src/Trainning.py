@@ -4,9 +4,6 @@ import pickle
 import pika
 from tqdm import tqdm
 
-import torch
-import torch.optim as optim
-import torch.nn as nn
 import threading
 from ultralytics.models.yolo.detect import DetectionTrainer
 import src.Log
