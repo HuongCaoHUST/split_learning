@@ -9,13 +9,12 @@ class Split_Learning_DetectionModel(DetectionModel):
     def __init__(self, cfg=None, nc=None, ch=3, verbose=True, 
                  layer_id=None, client_id=None, num_client=None, cut_layer=None,
                  address=None, username=None, password=None):
-        super().__init__()
+        super().__init__(cfg=cfg, ch=ch, nc=nc, verbose=verbose)
         self.layer_id = layer_id
         self.client_id = client_id
         self.num_client = num_client
         self.cut_layer = cut_layer
         self.cut_layer_ids = None
-
         # RabbitMQ
         self.address = address
         self.username = username
