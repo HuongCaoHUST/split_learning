@@ -95,7 +95,7 @@ class Server:
             total_client=self.total_clients,
             hybrid_training=self.hybrid_training,
             best_model_layer_1=[],
-            best_model_2=None,
+            best_model_2=[],
             epoch_model_layer_1=[],
             epoch_model_layer_2=[],
             dataset_path=self.dataset_path,
@@ -205,9 +205,10 @@ class Server:
             elif layer_id == 2:
                 best = message["best"]
                 src.Log.print_with_color(f"[<<<] Received best model from client: {best}", "blue")
-                self.val_function.best_model_2 = best
+                self.val_function.best_model_2.append(best)
                 print("BEST_2.pt:", self.val_function.best_model_2)
-                self.val_function.validate_best_model()
+                if len(self.val_function.best_model_layer_1) == self.total_clients[0] and len(self.val_function.best_model_2) == self.total_clients[1]:
+                    self.val_function.validate_best_model()
                 sys.exit()
 
         # Ack the message

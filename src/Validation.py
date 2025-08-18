@@ -51,7 +51,7 @@ class ModelValidator:
         
         if self.total_clients[0] == 1:
             model1 = YOLO(self.best_model_layer_1[0])
-            model2 = YOLO(self.best_model_2)
+            model2 = YOLO(self.best_model_2[0])
             output_path = self.output_model
 
             state_dict1 = model1.model.state_dict()
@@ -93,7 +93,7 @@ class ModelValidator:
                     except:
                         pass
 
-            model2 = YOLO(self.best_model_2)
+            model2 = YOLO(self.best_model_2[0])
             state_dict2 = model2.model.state_dict()
             new_state_dict = state_dict2.copy()
             new_state_dict.update(avg_state_dict)
@@ -115,7 +115,7 @@ class ModelValidator:
             # Load models tương ứng
             model_1a = YOLO(self.best_model_layer_1[0])
             model_1b = YOLO(self.best_model_layer_1[1])
-            model2 = YOLO(self.best_model_2)
+            model2 = YOLO(self.best_model_2[0])
 
             state_1a = model_1a.model.state_dict()
             state_1b = model_1b.model.state_dict()
@@ -168,7 +168,7 @@ class ModelValidator:
             model_1a = YOLO(self.best_model_layer_1[0])
             model_1b = YOLO(self.best_model_layer_1[1])
             model_1c = YOLO(self.best_model_layer_1[2])
-            model2 = YOLO(self.best_model_2)
+            model2 = YOLO(self.best_model_2[0])
 
             state_1a = model_1a.model.state_dict()
             state_1b = model_1b.model.state_dict()
