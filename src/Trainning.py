@@ -1,11 +1,8 @@
 import time
-import uuid
 import pickle
 import pika
 from tqdm import tqdm
-
-import threading
-from ultralytics.models.yolo.detect import DetectionTrainer
+from engine.train import Split_Learning_Trainer
 import src.Log
 
 
@@ -43,7 +40,7 @@ class Trainning:
                     address=address,
                     username=username,
                     password=password)
-        trainer = DetectionTrainer(overrides=args)
+        trainer = Split_Learning_Trainer(overrides=args)
         trainer.train()
         self.best_model = trainer.best
         notify_data = {"action": "NOTIFY", "client_id": self.client_id, "layer_id": self.layer_id,
