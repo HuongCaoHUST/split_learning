@@ -28,7 +28,6 @@ class Split_Learning_DetectionModel(DetectionModel):
         self.input_data_id = None
 
     def _predict_once(self, x, profile=False, visualize=False, embed=None):
-        print("Hế lô, tôi là Split_Learning_DetectionModel")
         y, dt, embeddings = [], [], []  # outputs
         embed = frozenset(embed) if embed is not None else {-1}
         max_idx = max(embed)
