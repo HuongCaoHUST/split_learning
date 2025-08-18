@@ -249,7 +249,7 @@ class Server:
                         response["delta_nc"] = delta_nc
                     dataset_index += 1
                 elif layer_id == 2:
-                    response["cut_layer"] = self.cut_layer
+                    response["cut_layer"] = self.cut_layer[0]
                     response["dataset_path"] = self.dataset_path[0]
 
             self.time_start = time.time_ns()

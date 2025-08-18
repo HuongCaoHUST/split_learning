@@ -14,14 +14,13 @@ model:
   model_path: ./yolo11n.pt
   cut_layer: 
     - 10
-    - 5
   hybrid_training: False
   valid_epoch_model: False
   output_model: ./merged_model.pt
 
 dataset:
   dataset_path:
-    - ./datasets/livingroom_4_1.yaml
+    - ./datasets/coco128.yaml
   concatenate_datasets: False
 
 log_path: .

@@ -29,18 +29,13 @@ class Trainning:
         src.Log.print_with_color("--- START TRAINING FIRST LAYER ---", "green")
         args = dict(model=model_path,
                     data=dataset_path,
-                    num_client=num_client,
                     epochs=epochs,
                     batch=batch_size,
                     project = './runs/detect',
-                    save_period = valid_epoch_model,
-                    client_id=self.client_id,
-                    layer_id=self.layer_id,
-                    cut_layer=cut_layer,
-                    address=address,
-                    username=username,
-                    password=password)
-        trainer = Split_Learning_Trainer(overrides=args)
+                    save_period = valid_epoch_model)
+        trainer = Split_Learning_Trainer(overrides=args, client_id=self.client_id,
+                                         layer_id=self.layer_id, num_client=num_client,
+                                         cut_layer=cut_layer, address=address, username=username, password=password)
         trainer.train()
         self.best_model = trainer.best
         notify_data = {"action": "NOTIFY", "client_id": self.client_id, "layer_id": self.layer_id,
@@ -71,20 +66,15 @@ class Trainning:
         src.Log.print_with_color("--- START TRAINING SECOND LAYER ---", "green")
         args = dict(model=model_path,
                     data=dataset_path,
-                    num_client=num_client,
                     epochs=epochs,
                     batch=batch_size,
                     project = './runs/detect',
-                    save_period = valid_epoch_model,
+                    save_period = valid_epoch_model
                     # optimizer='AdamW',
-                    client_id=self.client_id,
-                    close_mosaic = 5,
-                    layer_id=self.layer_id,
-                    cut_layer=cut_layer,
-                    address=address,
-                    username=username,
-                    password=password)
-        trainer = DetectionTrainer(overrides=args)
+                    )
+        trainer = Split_Learning_Trainer(overrides=args, client_id=self.client_id,
+                                         layer_id=self.layer_id, num_client=num_client,
+                                         cut_layer=cut_layer, address=address, username=username, password=password)
         trainer.train()
         self.best_model = trainer.best
         notify_data = {"action": "NOTIFY", "client_id": self.client_id, "layer_id": self.layer_id,

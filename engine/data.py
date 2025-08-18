@@ -10,7 +10,7 @@ from ultralytics.nn.autobackend import check_class_names
 from ultralytics.utils import (DATASETS_DIR, SETTINGS_FILE, LOGGER, YAML, clean_url, colorstr, emojis,)
 from typing import Dict
 
-def check_det_dataset(dataset: str, autodownload: bool = True) -> Dict:
+def check_det_dataset(dataset: str, layer_id: int = None, autodownload: bool = True) -> Dict:
     """
     Download, verify, and/or unzip a dataset if not found locally.
 
@@ -26,7 +26,6 @@ def check_det_dataset(dataset: str, autodownload: bool = True) -> Dict:
         (Dict): Parsed dataset information and paths.
     """
     file = check_file(dataset)
-
     # Download (optional)
     extract_dir = ""
     if zipfile.is_zipfile(file) or is_tarfile(file):
@@ -38,7 +37,17 @@ def check_det_dataset(dataset: str, autodownload: bool = True) -> Dict:
     data = YAML.load(file, append_filename=True)  # dictionary
 
     # Checks
-    for k in "train", "val":
+    if layer_id == 1:
+        for k in "train", "val":
+            if k not in data:
+                if k != "val" or "validation" not in data:
+                    raise SyntaxError(
+                        emojis(f"{dataset} '{k}:' key missing ❌.\n'train' and 'val' are required in all data YAMLs.")
+                    )
+                LOGGER.warning("renaming data YAML 'validation' key to 'val' to match YOLO format.")
+                data["val"] = data.pop("validation")  # replace 'validation' key with 'val' key
+    else:
+        k = "val"
         if k not in data:
             if k != "val" or "validation" not in data:
                 raise SyntaxError(
@@ -65,15 +74,26 @@ def check_det_dataset(dataset: str, autodownload: bool = True) -> Dict:
 
     # Set paths
     data["path"] = path  # download scripts
-    for k in "train", "val", "test", "minival":
-        if data.get(k):  # prepend path
-            if isinstance(data[k], str):
-                x = (path / data[k]).resolve()
-                if not x.exists() and data[k].startswith("../"):
-                    x = (path / data[k][3:]).resolve()
-                data[k] = str(x)
-            else:
-                data[k] = [str((path / x).resolve()) for x in data[k]]
+    if layer_id == 1:
+        for k in "train", "val", "test", "minival":
+            if data.get(k):  # prepend path
+                if isinstance(data[k], str):
+                    x = (path / data[k]).resolve()
+                    if not x.exists() and data[k].startswith("../"):
+                        x = (path / data[k][3:]).resolve()
+                    data[k] = str(x)
+                else:
+                    data[k] = [str((path / x).resolve()) for x in data[k]]
+    else:
+        for k in "val", "test", "minival":
+            if data.get(k):  # prepend path
+                if isinstance(data[k], str):
+                    x = (path / data[k]).resolve()
+                    if not x.exists() and data[k].startswith("../"):
+                        x = (path / data[k][3:]).resolve()
+                    data[k] = str(x)
+                else:
+                    data[k] = [str((path / x).resolve()) for x in data[k]]
 
     # Parse YAML
     val, s = (data.get(x) for x in ("val", "download"))
