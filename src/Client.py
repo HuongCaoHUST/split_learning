@@ -3,6 +3,7 @@ import pickle
 import pika
 import random
 from torch import nn
+import src.Utils
 import src.Log
 
 class Client:
@@ -26,7 +27,7 @@ class Client:
     def send_to_server(self, message):
         self.connect()
         self.response = None
-        self.channel.queue_declare('Server_queue', durable=False)
+        # self.channel.queue_declare('Server_queue', durable=False)
         self.channel.basic_publish(exchange='',
                                    routing_key='Server_queue',
                                    body=pickle.dumps(message))
@@ -42,10 +43,6 @@ class Client:
                 status = self.response_message(body)
                 break
             time.sleep(0.5)
-
-    def read_file(self, file_path):
-        with open(file_path, "rb") as file:
-            return file.read()
 
     def response_message(self, body):
         self.response = pickle.loads(body)
@@ -66,7 +63,7 @@ class Client:
                 result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, epochs, batch_size, self.address, self.username, self.password, valid_epoch_model)
             
             if self.virtual_machine:
-                file_data = self.read_file(best)
+                file_data = src.Utils.read_file(best)
                 data = {"action": "UPDATE", "client_id": self.client_id, "layer_id": self.layer_id,
                         "result": result, "message": "Sent parameters to Server", "vm": self.virtual_machine, "best": file_data}
             else:

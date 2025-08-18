@@ -668,8 +668,6 @@ class BaseTrainer:
                     # Backward
                     start_batch_backward_time = time.time()
                     self.scaler.scale(self.loss).backward()
-                    print("self.amp: ", self.amp)
-                    print("self.scaler2: ", self.scaler)
 
                     if self.layer_id == 2:
                         if hasattr(self.model, 'saved_tensor'):
@@ -955,8 +953,6 @@ class BaseTrainer:
                         received_data = pickle.loads(body)
                         data_id = received_data.get('data_id')
                         print("\nDATA_ID backward: ", data_id)
-                        print("Self.amp: ",self.amp)
-                        print("Self.scaler: ", self.scaler)
                         gradient_store = received_data.get('gadients', {})
                         if not isinstance(gradient_store, dict):
                             raise ValueError("Received 'gadients' is not a valid dictionary")

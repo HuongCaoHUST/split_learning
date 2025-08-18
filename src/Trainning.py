@@ -24,7 +24,6 @@ class Trainning:
 
     def send_to_server(self, message):
         print (f"[>>>] Client {self.client_id} send message to server: {message}")
-        self.channel.queue_declare('Server_queue', durable=False)
         self.channel.basic_publish(exchange='',
                                    routing_key='Server_queue',
                                    body=pickle.dumps(message))

@@ -1,10 +1,13 @@
 import os
 import pandas as pd
 import yaml
-from ultralytics.data.utils import check_cls_dataset
 from pathlib import Path
 
 IMG_FORMATS = {".bmp", ".dng", ".jpeg", ".jpg", ".mpo", ".png", ".tif", ".tiff", ".webp", ".pfm", ".heic"}  # image formats
+
+def read_file(file_path):
+        with open(file_path, "rb") as file:
+            return file.read()
 
 def init_csv(csv_file, headers):
         """
