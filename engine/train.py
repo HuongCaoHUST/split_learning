@@ -68,7 +68,6 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
             self.condition = threading.Condition()
 
         self.validate_intermediate = True
-        print("Cut_layer_1: ", self.cut_layer)
         super().__init__(overrides=overrides)
     
     def get_dataloader(self, dataset_path: str, batch_size: int = 16, rank: int = 0, mode: str = "train"):

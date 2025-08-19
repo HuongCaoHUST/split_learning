@@ -108,7 +108,6 @@ class Split_Learning_DetectionModel(DetectionModel):
         else:
             y = [None] * len(self.model)
             
-        print("Self.cut_layer_2: ", self.cut_layer)
         for m in self.model[start_layer:]:
             if m.i == self.cut_layer + 1  and self.layer_id == 1:
                 # print(f"Cut layer {m.i} reached, stopping forward pass.")

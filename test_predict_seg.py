@@ -2,7 +2,7 @@ from ultralytics import YOLO
 import cv2
 
 # Load a segmentation model
-model = YOLO("yolo11n-seg.pt")
+model = YOLO("./merged_model.pt")
 
 # Run prediction
 results = model("https://ultralytics.com/images/bus.jpg")

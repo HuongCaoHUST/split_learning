@@ -21,7 +21,7 @@ model:
 
 dataset:
   dataset_path:
-    - ./datasets/coco128.yaml
+    - ./datasets/coco128-seg.yaml
   concatenate_datasets: False
 
 log_path: .
