@@ -8,16 +8,21 @@ import uuid
 import pickle
 import pika
 import pandas as pd
+from copy import copy
+from pathlib import Path
+from typing import Dict, Optional, Union
 from torch import distributed as dist
 from torch import nn
 from ultralytics.models.yolo.detect import DetectionTrainer
 from typing import Optional
 from ultralytics.utils import RANK
-from engine.model import Split_Learning_DetectionModel
+from engine.model import Split_Learning_DetectionModel, Split_Learning_SegmentationModel
+from ultralytics.models.yolo.segment import SegmentationValidator
 from ultralytics import __version__
 from ultralytics.utils.checks import check_amp, check_imgsz
 from ultralytics.data.utils import check_cls_dataset
 from ultralytics.data import build_dataloader
+from ultralytics.utils.plotting import plot_results
 from engine.data import check_det_dataset
 from copy import deepcopy
 from datetime import datetime
@@ -40,16 +45,13 @@ from ultralytics.utils.torch_utils import (
     ModelEMA,
     autocast,
     convert_optimizer_state_dict_to_fp16,
-    init_seeds,
-    one_cycle,
-    select_device,
     strip_optimizer,
     torch_distributed_zero_first,
     unset_deterministic,
 )
 import threading
 
-class Split_Learning_Trainer(DetectionTrainer):
+class Split_Learning_DetectionTrainer(DetectionTrainer):
     def __init__(self, overrides, client_id=None, layer_id=None, num_client=None, cut_layer=None, address=None, username=None, password=None):
         self.client_id = client_id
         self.layer_id = layer_id
@@ -59,13 +61,14 @@ class Split_Learning_Trainer(DetectionTrainer):
         self.address = address
         self.username = username
         self.password = password
-        Utils.init_csv('./log_time.csv', ['layer_id', 'client_id', 'epoch', 'forward/backward/end_epoch', 'duration'])
+        Utils.init_csv('./log/log_time.csv', ['layer_id', 'client_id', 'epoch', 'forward/backward/end_epoch', 'duration'])
         self.status_train = False
         self.count_batch = 0
         if self.layer_id == 1:
             self.condition = threading.Condition()
 
         self.validate_intermediate = True
+        print("Cut_layer_1: ", self.cut_layer)
         super().__init__(overrides=overrides)
     
     def get_dataloader(self, dataset_path: str, batch_size: int = 16, rank: int = 0, mode: str = "train"):
@@ -124,21 +127,6 @@ class Split_Learning_Trainer(DetectionTrainer):
             "Instances",
             "Size",
             )
-    
-    def connect_rabbitmq(self):
-        try:
-            credentials = pika.PlainCredentials(self.username, self.password)
-            parameters = pika.ConnectionParameters(
-                host=self.address,
-                port=5672,
-                virtual_host='/',
-                credentials=credentials
-            )
-            connection = pika.BlockingConnection(parameters)
-            channel = connection.channel()
-            return channel
-        except Exception as e:
-            return None
     
     def _setup_train(self, world_size):
         """Build dataloaders and optimizer on correct rank process."""
@@ -257,7 +245,7 @@ class Split_Learning_Trainer(DetectionTrainer):
         if world_size > 1:
             self._setup_ddp(world_size)
         self._setup_train(world_size)
-        self.channel = self.connect_rabbitmq()
+        self.channel = Utils.connect_rabbitmq(self.address, self.username, self.password)
         self.model.channel = self.channel
         if self.layer_id == 1:
             nb = len(self.train_loader)  # number of batches
@@ -365,38 +353,14 @@ class Split_Learning_Trainer(DetectionTrainer):
                         preds = self.model(batch["img"])
 
                         duration = round(self.model.end_batch_forward_time - start_batch_forward_time, 2)
-                        self.log_to_csv('./log/log_time.csv', {
+                        Utils.log_to_csv('./log/log_time.csv', {
                             'layer_id': self.layer_id,
                             'client_id': self.client_id,
                             'epoch': epoch+1,
                             'forward/backward/end_epoch': 'forward',
                             'duration': round(duration, 2)
                         })
-                    # success_grad, gradient_dict = self.wait_gradient()
 
-                    # if not success_grad:
-                    #     print("Không thấy Gradient.")
-                    #     return
-                    
-                    # # Backward
-                    # tensor_list = [self.model.data_store[t_id] for t_id in gradient_dict.keys()]
-                    # grad_list = [gradient_dict[t_id] for t_id in gradient_dict.keys()]
-
-                    # torch.autograd.backward(tensor_list, grad_list)
-
-                    # # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
-                    # if ni - last_opt_step >= self.accumulate:
-                    #     self.optimizer_step()
-                    #     last_opt_step = ni
-                    #     # Timed stopping
-                    #     if self.args.time:
-                    #         self.stop = (time.time() - self.train_time_start) > (self.args.time * 3600)
-                    #         if RANK != -1:  # if DDP training
-                    #             broadcast_list = [self.stop if RANK == 0 else None]
-                    #             dist.broadcast_object_list(broadcast_list, 0)  # broadcast 'stop' to all ranks
-                    #             self.stop = broadcast_list[0]
-                    #         if self.stop:  # training time exceeded
-                    #             break
                     # Log
                     if RANK in {-1, 0}:
                         pbar.set_description(f"{epoch + 1}/{self.epochs}")
@@ -411,7 +375,7 @@ class Split_Learning_Trainer(DetectionTrainer):
 
                 end_epoch_time = time.time()
                 duration = round(end_epoch_time - start_epoch_time, 2)
-                self.log_to_csv('./log/log_time.csv', {
+                Utils.log_to_csv('./log/log_time.csv', {
                     'layer_id': self.layer_id,
                     'client_id': self.client_id,
                     'epoch': epoch+1,
@@ -504,7 +468,7 @@ class Split_Learning_Trainer(DetectionTrainer):
                         )
 
                     duration = round(self.model.end_batch_forward_time - start_batch_forward_time, 2)
-                    self.log_to_csv('./log/log_time.csv', {
+                    Utils.log_to_csv('./log/log_time.csv', {
                         'layer_id': self.layer_id,
                         'client_id': self.client_id,
                         'epoch': epoch+1,
@@ -557,7 +521,7 @@ class Split_Learning_Trainer(DetectionTrainer):
                     # Log time
                     end_batch_backward_time = time.time()
                     duration = round(end_batch_backward_time - start_batch_backward_time, 2)
-                    self.log_to_csv('./log/log_time.csv', {
+                    Utils.log_to_csv('./log/log_time.csv', {
                         'layer_id': self.layer_id,
                         'client_id': self.client_id,
                         'epoch': epoch+1,
@@ -840,7 +804,7 @@ class Split_Learning_Trainer(DetectionTrainer):
                         # Log
                         end_batch_backward_time = time.time()
                         duration = round(end_batch_backward_time - start_batch_backward_time, 2)
-                        self.log_to_csv('./log/log_time.csv', {
+                        Utils.log_to_csv('./log/log_time.csv', {
                             'layer_id': self.layer_id,
                             'client_id': self.client_id,
                             'epoch': self.epoch + 1,
@@ -894,20 +858,6 @@ class Split_Learning_Trainer(DetectionTrainer):
         tensor_send_id.append(cut_layer)
         print ("SEND tensor id: ", tensor_send_id)
         return tensor_send_id
-
-    def init_csv(self, csv_file, headers):
-        """
-        Init csv log file
-        """
-        df = pd.DataFrame(columns=headers)
-        df.to_csv(csv_file, index=False)
-    
-    def log_to_csv(self, csv_file, data_dict):
-        """
-        Log to csv file
-        """
-        df = pd.DataFrame([data_dict])
-        df.to_csv(csv_file, mode='a', header=not os.path.exists(csv_file), index=False)
 
     def send_epoch_intermediate(self, epoch_intermediate_path = None):
         queue_name = f'Server_queue'
@@ -1028,3 +978,51 @@ class Split_Learning_Trainer(DetectionTrainer):
                         self.metrics = self.validator(model=f)
                     self.metrics.pop("fitness", None)
                     self.run_callbacks("on_fit_epoch_end")
+
+class Split_Learning_SegmentationTrainer(Split_Learning_DetectionTrainer):
+    def __init__(self, overrides, client_id=None, layer_id=None, num_client=None, cut_layer=None, address=None, 
+                username=None, password=None, _callbacks=None):
+        if overrides is None:
+            overrides = {}
+        overrides["task"] = "segment"
+        super().__init__(
+            overrides=overrides,
+            client_id=client_id,
+            layer_id=layer_id,
+            num_client=num_client,
+            cut_layer=cut_layer,
+            address=address,
+            username=username,
+            password=password,
+        )
+
+    def get_model(
+        self, cfg: Optional[Union[Dict, str]] = None, weights: Optional[Union[str, Path]] = None, verbose: bool = True
+    ):
+        model = Split_Learning_SegmentationModel(
+            cfg,
+            nc=self.data["nc"],
+            ch=self.data["channels"],
+            verbose=verbose and RANK == -1,
+            layer_id=getattr(self, 'layer_id', None),
+            client_id=getattr(self, 'client_id', None),
+            num_client=getattr(self, 'num_client', None),
+            cut_layer=getattr(self, 'cut_layer', None),
+            address=getattr(self, 'address', None),
+            username=getattr(self, 'username', None),
+            password=getattr(self, 'password', None)
+        )
+        if weights:
+            model.load(weights)
+        return model
+
+    def get_validator(self):
+        """Return a SegmentationValidator cho split learning segmentation."""
+        self.loss_names = "box_loss", "seg_loss", "cls_loss", "dfl_loss"
+        return SegmentationValidator(
+            self.test_loader, save_dir=self.save_dir, args=copy(self.args), _callbacks=self.callbacks
+        )
+
+    def plot_metrics(self):
+        """Plot metrics segmentation."""
+        plot_results(file=self.csv, segment=True, on_plot=self.on_plot)

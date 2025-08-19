@@ -36,18 +36,18 @@ def delete_old_queues(address, username, password):
         for queue in queues:
             queue_name = queue['name']
             if queue_name.startswith("reply") or queue_name.startswith("intermediate_queue") or queue_name.startswith(
-                    "gradient_queue") or queue_name.startswith("rpc_queue") or queue_name.startswith("label_queue"):
+                    "gradient_queue") or queue_name.startswith("label_queue"):
                 try:
                     http_channel.queue_delete(queue=queue_name)
                     src.Log.print_with_color(f"Queue '{queue_name}' deleted.", "green")
                 except Exception as e:
                     src.Log.print_with_color(f"Failed to delete queue '{queue_name}': {e}", "yellow")
-            else:
-                try:
-                    http_channel.queue_purge(queue=queue_name)
-                    src.Log.print_with_color(f"Queue '{queue_name}' deleted.", "green")
-                except Exception as e:
-                    src.Log.print_with_color(f"Failed to purge queue '{queue_name}': {e}", "yellow")
+            # else:
+            #     try:
+            #         http_channel.queue_purge(queue=queue_name)
+            #         src.Log.print_with_color(f"Queue '{queue_name}' deleted.", "green")
+            #     except Exception as e:
+            #         src.Log.print_with_color(f"Failed to purge queue '{queue_name}': {e}", "yellow")
 
         connection.close()
         return True

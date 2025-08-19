@@ -4,6 +4,7 @@ import pickle
 import threading
 import uuid
 from ultralytics.nn.tasks import DetectionModel
+from ultralytics.utils.loss import v8SegmentationLoss
 from ultralytics.utils.plotting import feature_visualization
 
 class Split_Learning_DetectionModel(DetectionModel):
@@ -107,6 +108,7 @@ class Split_Learning_DetectionModel(DetectionModel):
         else:
             y = [None] * len(self.model)
             
+        print("Self.cut_layer_2: ", self.cut_layer)
         for m in self.model[start_layer:]:
             if m.i == self.cut_layer + 1  and self.layer_id == 1:
                 # print(f"Cut layer {m.i} reached, stopping forward pass.")
@@ -220,3 +222,23 @@ class Split_Learning_DetectionModel(DetectionModel):
                 print("Error in check_forward thread:", e)
                 break
             time.sleep(0.2)
+
+class Split_Learning_SegmentationModel(Split_Learning_DetectionModel):
+    """
+    YOLO segmentation model for Split Learning.
+    """
+
+    def __init__(self, cfg=None, nc=None, ch=3, verbose=True,
+                 layer_id=None, client_id=None, num_client=None, cut_layer=None,
+                 address=None, username=None, password=None):
+
+        super().__init__(cfg=cfg, nc=nc, ch=ch, verbose=verbose,
+                         layer_id=layer_id, client_id=client_id,
+                         num_client=num_client, cut_layer=cut_layer,
+                         address=address, username=username, password=password)
+
+    def init_criterion(self):
+        """Initialize the loss criterion for the Split Learning SegmentationModel."""
+        return v8SegmentationLoss(self)
+
+    

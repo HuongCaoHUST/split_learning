@@ -11,7 +11,8 @@ rabbit:
   password: password
 
 model:
-  model_path: ./yolo11n.pt
+  model_path: ./yolo11n-seg.pt
+  task: SEGMENT
   cut_layer: 
     - 10
   hybrid_training: False

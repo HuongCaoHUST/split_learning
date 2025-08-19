@@ -27,7 +27,7 @@ class Client:
     def send_to_server(self, message):
         self.connect()
         self.response = None
-        # self.channel.queue_declare('Server_queue', durable=False)
+        self.channel.queue_declare('Server_queue', durable=False)
         self.channel.basic_publish(exchange='',
                                    routing_key='Server_queue',
                                    body=pickle.dumps(message))
