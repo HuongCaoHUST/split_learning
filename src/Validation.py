@@ -1,5 +1,6 @@
 from ultralytics.models.yolo.detect import DetectionValidator
 from ultralytics.models.yolo.segment import SegmentationValidator
+from ultralytics.models.yolo.classify import ClassificationValidator
 from ultralytics import YOLO
 import src.Utils
 
@@ -18,7 +19,7 @@ class ModelValidator:
             print("Best model layer 1 full: ", self.best_model_layer_1)
             merge_model = self.merge_yolo_models()
             args = dict(model=merge_model, data=self.dataset_path[0], project = './runs/detect',)
-            validator = SegmentationValidator(args=args)
+            validator = ClassificationValidator(args=args)
             validator()
             return True
     

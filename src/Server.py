@@ -89,7 +89,7 @@ class Server:
         self.dataset_path = config["dataset"]["dataset_path"]
         if len(self.total_clients) > len(self.dataset_path):
             self.dataset_path = [self.dataset_path[0] for _ in range(len(self.total_clients))]
-        self.nb_client = src.Utils.check_dataset(self.dataset_path, self.batch_size)
+        # self.nb_client = src.Utils.check_dataset(self.dataset_path, self.batch_size)
 
         self.val_function = ModelValidator(
             total_client=self.total_clients,
@@ -224,8 +224,8 @@ class Server:
         self.layer1_clients_id = [client_id for client_id, layer_id in self.list_clients if layer_id == 1]
         print("layer1_1_client: ", self.layer1_clients_id)
 
-        self.data_distribution = dict(zip(self.layer1_clients_id, self.nb_client))
-        print("data_distribution: ", self.data_distribution)
+        # self.data_distribution = dict(zip(self.layer1_clients_id, self.nb_client))
+        # print("data_distribution: ", self.data_distribution)
 
         dataset_index = 0
         for (client_id, layer_id) in self.list_clients:

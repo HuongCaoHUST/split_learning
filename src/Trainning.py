@@ -2,7 +2,7 @@ import time
 import pickle
 import pika
 from tqdm import tqdm
-from engine.train import Split_Learning_DetectionTrainer, Split_Learning_SegmentationTrainer
+from engine.train import Split_Learning_DetectionTrainer, Split_Learning_SegmentationTrainer, Split_Learning_ClassificationTrainer
 import src.Log
 
 
@@ -27,13 +27,13 @@ class Trainning:
 
     def train_on_first_layer(self, model_path, dataset_path, num_client, cut_layer, epochs, batch_size, address = None, username = None, password = None, valid_epoch_model = -1):
         src.Log.print_with_color("--- START TRAINING FIRST LAYER ---", "green")
-        args = dict(model="./yolo11n-seg.pt",
-                    data="./datasets/coco128-seg.yaml",
+        args = dict(model="./yolo11n-cls.pt",
+                    data="./datasets/mnist160",
                     epochs=epochs,
                     batch=batch_size,
                     project = './runs/detect',
                     save_period = valid_epoch_model)
-        trainer = Split_Learning_SegmentationTrainer(overrides=args, client_id=self.client_id,
+        trainer = Split_Learning_ClassificationTrainer(overrides=args, client_id=self.client_id,
                                          layer_id=self.layer_id, num_client=num_client,
                                          cut_layer=cut_layer, address=address, username=username, password=password)
         trainer.train()
@@ -64,15 +64,15 @@ class Trainning:
         print('Waiting for intermediate output. To exit press CTRL+C')
 
         src.Log.print_with_color("--- START TRAINING SECOND LAYER ---", "green")
-        args = dict(model="./yolo11n-seg.pt",
-                    data="./datasets/coco128-seg.yaml",
+        args = dict(model="./yolo11n-cls.pt",
+                    data="./datasets/mnist160",
                     epochs=epochs,
                     batch=batch_size,
                     project = './runs/detect',
                     save_period = valid_epoch_model
                     # optimizer='AdamW',
                     )
-        trainer = Split_Learning_SegmentationTrainer(overrides=args, client_id=self.client_id,
+        trainer = Split_Learning_ClassificationTrainer(overrides=args, client_id=self.client_id,
                                          layer_id=self.layer_id, num_client=num_client,
                                          cut_layer=cut_layer, address=address, username=username, password=password)
         trainer.train()
