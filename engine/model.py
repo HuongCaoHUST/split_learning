@@ -240,7 +240,7 @@ class Split_Learning_SegmentationModel(Split_Learning_DetectionModel):
         """Initialize the loss criterion for the Split Learning SegmentationModel."""
         return v8SegmentationLoss(self)
 
-class Split_Learning_DetectionModel(ClassificationModel):
+class Split_Learning_ClassificationModel(ClassificationModel):
     def __init__(self, cfg=None, nc=None, ch=3, verbose=True, 
                  layer_id=None, client_id=None, num_client=None, cut_layer=None,
                  address=None, username=None, password=None):

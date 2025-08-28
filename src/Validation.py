@@ -5,9 +5,10 @@ from ultralytics import YOLO
 import src.Utils
 
 class ModelValidator:
-    def __init__(self, total_client, hybrid_training, best_model_layer_1, best_model_2, epoch_model_layer_1, epoch_model_layer_2, dataset_path, output_model):
+    def __init__(self, total_client, hybrid_training, cut_layer, best_model_layer_1, best_model_2, epoch_model_layer_1, epoch_model_layer_2, dataset_path, output_model):
         self.total_clients = total_client
         self.hybrid_training = hybrid_training
+        self.cut_layer = cut_layer
         self.best_model_layer_1 = best_model_layer_1
         self.best_model_2 = best_model_2
         self.epoch_model_layer_1 = epoch_model_layer_1
@@ -18,9 +19,13 @@ class ModelValidator:
     def validate_best_model(self):
             print("Best model layer 1 full: ", self.best_model_layer_1)
             merge_model = self.merge_yolo_models()
-            args = dict(model=merge_model, data=self.dataset_path[0], project = './runs/detect',)
-            validator = ClassificationValidator(args=args)
-            validator()
+            # args = dict(model=merge_model, data=self.dataset_path[0], project = './runs/detect',)
+            # validator = ClassificationValidator(args=args)
+            # validator()
+            print("Test cuối")
+            model = YOLO(merge_model)
+            metrics = model.val()
+            print("metrics: ", metrics)
             return True
     
     def validate_epoch_model(self):
@@ -58,7 +63,7 @@ class ModelValidator:
 
             state_dict1 = model1.model.state_dict()
             state_dict2 = model2.model.state_dict()
-
+            print("Self.cut_layer: ", self.cut_layer[0])
             new_state_dict = state_dict2.copy()
 
             for k in state_dict1.keys():
@@ -74,7 +79,11 @@ class ModelValidator:
 
             model2.save(output_path)
 
+            print("Test trong merge")
             print(f"Đã ghép xong model và lưu tại: {output_path}")
+            model = YOLO(output_path)
+            metrics = model.val()
+            print("metrics: ", metrics)
             return output_path
         elif self.total_clients[0] > 1 and self.hybrid_training == False:
             state_dicts = []

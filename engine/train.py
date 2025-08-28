@@ -17,7 +17,7 @@ from ultralytics.models.yolo.detect import DetectionTrainer
 from ultralytics.models.yolo.classify import ClassificationTrainer
 from typing import Optional
 from ultralytics.utils import RANK
-from engine.model import Split_Learning_DetectionModel, Split_Learning_SegmentationModel
+from engine.model import Split_Learning_DetectionModel, Split_Learning_SegmentationModel, Split_Learning_ClassificationModel
 from ultralytics.models.yolo.segment import SegmentationValidator
 from ultralytics import __version__
 from ultralytics.utils.checks import check_amp, check_imgsz
@@ -1070,7 +1070,7 @@ class Split_Learning_ClassificationTrainer(ClassificationTrainer):
         return build_dataloader(dataset, batch_size, workers, shuffle, rank, drop_last=True)  # return dataloader; Drop_last for split_learning
     
     def get_model(self, cfg: Optional[str] = None, weights: Optional[str] = None, verbose: bool = True):
-        model = Split_Learning_DetectionModel(cfg, nc=self.data["nc"], ch=self.data["channels"], verbose=verbose and RANK == -1,
+        model = Split_Learning_ClassificationModel(cfg, nc=self.data["nc"], ch=self.data["channels"], verbose=verbose and RANK == -1,
                             layer_id=getattr(self, 'layer_id', None),
                             client_id=getattr(self, 'client_id', None),
                             num_client=getattr(self, 'num_client', None),
@@ -1569,7 +1569,7 @@ class Split_Learning_ClassificationTrainer(ClassificationTrainer):
             # Do final val with best.pt
             seconds = time.time() - self.train_time_start
             LOGGER.info(f"\n{epoch - self.start_epoch + 1} epochs completed in {seconds / 3600:.3f} hours.")
-            self.final_eval()
+            # self.final_eval()
             if self.args.plots and self.layer_id != 1:
                 self.plot_metrics()
             self.run_callbacks("on_train_end")

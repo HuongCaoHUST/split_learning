@@ -94,6 +94,7 @@ class Server:
         self.val_function = ModelValidator(
             total_client=self.total_clients,
             hybrid_training=self.hybrid_training,
+            cut_layer=self.cut_layer,
             best_model_layer_1=[],
             best_model_2=[],
             epoch_model_layer_1=[],
