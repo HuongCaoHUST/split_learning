@@ -24,7 +24,7 @@ class ModelValidator:
             # validator()
             print("Test cuối")
             model = YOLO(merge_model)
-            metrics = model.val()
+            metrics = model.val(data=self.dataset_path[0])
             print("metrics: ", metrics)
             return True
     
@@ -81,9 +81,9 @@ class ModelValidator:
 
             print("Test trong merge")
             print(f"Đã ghép xong model và lưu tại: {output_path}")
-            model = YOLO(output_path)
-            metrics = model.val()
-            print("metrics: ", metrics)
+            # model = YOLO(output_path)
+            # metrics = model.val()
+            # print("metrics: ", metrics)
             return output_path
         elif self.total_clients[0] > 1 and self.hybrid_training == False:
             state_dicts = []
