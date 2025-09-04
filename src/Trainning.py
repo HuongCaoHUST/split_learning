@@ -28,7 +28,7 @@ class Trainning:
     def train_on_first_layer(self, model_path, dataset_path, num_client, cut_layer, epochs, batch_size, address = None, username = None, password = None, valid_epoch_model = -1):
         src.Log.print_with_color("--- START TRAINING FIRST LAYER ---", "green")
         args = dict(model="./yolo11n-cls.pt",
-                    data="./datasets/mnist160",
+                    data=dataset_path,
                     epochs=epochs,
                     batch=batch_size,
                     project = './runs/detect',
@@ -65,7 +65,7 @@ class Trainning:
 
         src.Log.print_with_color("--- START TRAINING SECOND LAYER ---", "green")
         args = dict(model="./yolo11n-cls.pt",
-                    data="./datasets/mnist160",
+                    data=dataset_path,
                     epochs=epochs,
                     batch=batch_size,
                     project = './runs/detect',

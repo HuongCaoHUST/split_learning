@@ -81,11 +81,9 @@ class ModelValidator:
 
             print("Test trong merge")
             print(f"Đã ghép xong model và lưu tại: {output_path}")
-            # model = YOLO(output_path)
-            # metrics = model.val()
-            # print("metrics: ", metrics)
             return output_path
         elif self.total_clients[0] > 1 and self.hybrid_training == False:
+            print("Ghép cho 2 client")
             state_dicts = []
             for model_path in self.best_model_layer_1:
                 model = YOLO(model_path)
@@ -97,7 +95,7 @@ class ModelValidator:
                 if key.startswith("model."):
                     try:
                         layer_num = int(key.split('.')[1])
-                        if layer_num <= self.cut_layer:
+                        if layer_num <= self.cut_layer[0]:
                             weights = [sd[key] for sd in state_dicts]
                             avg_weight = sum(weights) / len(weights)
                             avg_state_dict[key] = avg_weight
@@ -111,7 +109,6 @@ class ModelValidator:
 
             model2.model.load_state_dict(new_state_dict)
             model2.save(output_path)
-
             print(f"Đã ghép xong model và lưu tại: {output_path}")
             return output_path
         
