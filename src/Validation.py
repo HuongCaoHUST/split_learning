@@ -22,7 +22,7 @@ class ModelValidator:
             # args = dict(model=merge_model, data=self.dataset_path[0], project = './runs/detect',)
             # validator = ClassificationValidator(args=args)
             # validator()
-            print("Test cuối")
+            print("Test cuối; dataset: ", self.dataset_path[0])
             model = YOLO(merge_model)
             metrics = model.val(data=self.dataset_path[0])
             print("metrics: ", metrics)
