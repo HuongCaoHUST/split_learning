@@ -1222,6 +1222,7 @@ class Split_Learning_ClassificationTrainer(ClassificationTrainer):
         self._setup_train(world_size)
         self.channel = Utils.connect_rabbitmq(self.address, self.username, self.password)
         self.model.channel = self.channel
+        print("Self.model: ", self.model.names)
         if self.layer_id == 1:
             nb = len(self.train_loader)  # number of batches
             nw = max(round(self.args.warmup_epochs * nb), 100) if self.args.warmup_epochs > 0 else -1  # warmup iterations
@@ -1590,7 +1591,15 @@ class Split_Learning_ClassificationTrainer(ClassificationTrainer):
     def send_label(self, data_id, labels):
         queue_name = f'label_queue'
         self.channel.queue_declare(queue_name, durable=False)
-        # print("Label IDX: ", labels['cls'])
+        print("Label IDX: ", labels['cls'])
+
+        CLIENT_LABEL_MAP = self.build_client_map(self.model.names)
+        print(CLIENT_LABEL_MAP)
+        local_labels = labels["cls"]
+        global_labels = [CLIENT_LABEL_MAP[int(l)] for l in local_labels]
+        print(f"Local label: {local_labels} -> Global label: {global_labels}")
+        labels['cls'] = torch.tensor(global_labels)
+        # print("Label IDX 2: ", labels['cls'])
         message = pickle.dumps(
             {"data_id": data_id,
             "label": labels}
@@ -1953,3 +1962,22 @@ class Split_Learning_ClassificationTrainer(ClassificationTrainer):
                         self.metrics = self.validator(model=f)
                     self.metrics.pop("fitness", None)
                     self.run_callbacks("on_fit_epoch_end")
+
+    def build_client_map(self, local_names):
+        GLOBAL_LABELS = {
+            0: "airplane",
+            1: "automobile",
+            2: "bird",
+            3: "cat",
+            4: "deer",
+            5: "dog",
+            6: "frog",
+            7: "horse",
+            8: "ship",
+            9: "truck"
+        }
+        reverse_global = {v: k for k, v in GLOBAL_LABELS.items()}  # {name: global_id}
+        mapping = {}
+        for local_id, name in local_names.items():
+            mapping[local_id] = reverse_global[name]
+        return mapping

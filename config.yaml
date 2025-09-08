@@ -2,7 +2,7 @@ name: Split Learning
 server:
   num-round: 1
   clients:
-    - 4
+    - 2
     - 1
 
 rabbit:
@@ -14,8 +14,6 @@ model:
   model_path: ./yolo11n.pt
   task: SEGMENT
   cut_layer: 
-    - 5
-    - 5
     - 5
     - 5
   hybrid_training: False

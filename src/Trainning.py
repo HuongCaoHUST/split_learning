@@ -65,7 +65,7 @@ class Trainning:
 
         src.Log.print_with_color("--- START TRAINING SECOND LAYER ---", "green")
         args = dict(model="./yolo11n-cls.pt",
-                    data="cifar10",
+                    data="./datasets/cifar10_yolo_cls",
                     epochs=epochs,
                     batch=batch_size,
                     project = './runs/detect',
