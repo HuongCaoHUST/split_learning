@@ -2,7 +2,7 @@ name: Split Learning
 server:
   num-round: 1
   clients:
-    - 2
+    - 4
     - 1
 
 rabbit:
@@ -16,14 +16,18 @@ model:
   cut_layer: 
     - 5
     - 5
+    - 5
+    - 5
   hybrid_training: False
   valid_epoch_model: False
   output_model: ./merged_model.pt
 
 dataset:
   dataset_path:
-    - ./datasets/mnist160_1
-    - ./datasets/mnist160_2
+    - ./datasets/cifar10_yolo_cls_dirichlet_a0_3_K10/client_0
+    - ./datasets/cifar10_yolo_cls_dirichlet_a0_3_K10/client_1
+    - ./datasets/cifar10_yolo_cls_dirichlet_a0_3_K10/client_2
+    - ./datasets/cifar10_yolo_cls_dirichlet_a0_3_K10/client_3
   concatenate_datasets: False
 
 log_path: .
