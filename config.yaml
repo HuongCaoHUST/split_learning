@@ -22,8 +22,8 @@ model:
 
 dataset:
   dataset_path:
-    - ./datasets/mnist160_1
-    - ./datasets/mnist160_2
+    - ./datasets/mnist160_ver2_1
+    - ./datasets/mnist160_ver2_2
   concatenate_datasets: False
 
 log_path: .

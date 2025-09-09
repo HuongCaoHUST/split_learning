@@ -17,16 +17,16 @@ class ModelValidator:
         self.output_model = output_model
 
     def validate_best_model(self):
-            print("Best model layer 1 full: ", self.best_model_layer_1)
-            merge_model = self.merge_yolo_models()
-            # args = dict(model=merge_model, data=self.dataset_path[0], project = './runs/detect',)
-            # validator = ClassificationValidator(args=args)
-            # validator()
-            print("Test cuối; dataset: ", self.dataset_path[0])
-            model = YOLO(merge_model)
-            metrics = model.val(data=self.dataset_path[0])
-            print("metrics: ", metrics)
-            return True
+        print("Best model layer 1 full: ", self.best_model_layer_1)
+        merge_model = self.merge_yolo_models()
+        # args = dict(model=merge_model, data=self.dataset_path[0], project = './runs/detect',)
+        # validator = ClassificationValidator(args=args)
+        # validator()
+        print("Test cuối; dataset: ", self.dataset_path[0])
+        model = YOLO(merge_model)
+        metrics = model.val(data="./datasets/mnist160")
+        print("metrics: ", metrics)
+        return True
     
     def validate_epoch_model(self):
         epoch = 0

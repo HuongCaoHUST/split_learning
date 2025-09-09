@@ -1590,7 +1590,14 @@ class Split_Learning_ClassificationTrainer(ClassificationTrainer):
     def send_label(self, data_id, labels):
         queue_name = f'label_queue'
         self.channel.queue_declare(queue_name, durable=False)
-        # print("Label IDX: ", labels['cls'])
+        print("Label IDX: ", labels['cls'])
+        CLIENT_LABEL_MAP = self.build_client_map(self.model.names)
+        print(CLIENT_LABEL_MAP)
+        local_labels = labels["cls"]
+        global_labels = [CLIENT_LABEL_MAP[int(l)] for l in local_labels]
+        print(f"Local label: {local_labels} -> Global label: {global_labels}")
+        labels['cls'] = torch.tensor(global_labels)
+        print("Label IDX 2: ", labels['cls'])
         message = pickle.dumps(
             {"data_id": data_id,
             "label": labels}
@@ -1953,3 +1960,22 @@ class Split_Learning_ClassificationTrainer(ClassificationTrainer):
                         self.metrics = self.validator(model=f)
                     self.metrics.pop("fitness", None)
                     self.run_callbacks("on_fit_epoch_end")
+    
+    def build_client_map(self, local_names):
+        GLOBAL_LABELS = {
+            0: "0",
+            1: "1",
+            2: "2",
+            3: "3",
+            4: "4",
+            5: "5",
+            6: "6",
+            7: "7",
+            8: "8",
+            9: "9"
+        }
+        reverse_global = {v: k for k, v in GLOBAL_LABELS.items()}  # {name: global_id}
+        mapping = {}
+        for local_id, name in local_names.items():
+            mapping[local_id] = reverse_global[name]
+        return mapping
