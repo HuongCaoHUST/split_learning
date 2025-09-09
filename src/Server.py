@@ -6,6 +6,7 @@ import sys
 import yaml
 import numpy as np
 import requests
+import random
 from ultralytics.data.utils import check_det_dataset
 from requests.auth import HTTPBasicAuth
 import src.Log
@@ -72,6 +73,7 @@ class Server:
         self.lr = config["learning"]["learning-rate"]
         self.momentum = config["learning"]["momentum"]
         self.epochs = config["learning"]["epochs"]
+        self.worker = config["learning"]["worker"]
 
         self.register_clients = [0 for _ in range(len(self.total_clients))]
         self.list_clients = []
@@ -86,7 +88,7 @@ class Server:
         self.output_model = config["model"]["output_model"]
 
         #Dataset
-        self.dataset_path = config["dataset"]["dataset_path"]
+        self.dataset_path = config["dataset"]["dataset_path"] if not config["dataset"]["iid_datasets"] else self.random_dataset(num_clients=self.total_clients[0])
         if len(self.total_clients) > len(self.dataset_path):
             self.dataset_path = [self.dataset_path[0] for _ in range(len(self.total_clients))]
         # self.nb_client = src.Utils.check_dataset(self.dataset_path, self.batch_size)
@@ -239,6 +241,7 @@ class Server:
                             "batch_size": self.batch_size,
                             "lr": self.lr,
                             "momentum": self.momentum,
+                            "worker": self.worker,
                             "valid_epoch_model": self.valid_epoch_model}
                 
                 if layer_id == 1:
@@ -268,3 +271,12 @@ class Server:
             routing_key=reply_queue_name,
             body=message
         )
+
+    def random_dataset(self, num_clients):
+        dataset_path = "./datasets/mnist_yolo_cls_dirichlet"
+        all_clients = [d for d in os.listdir(dataset_path) if os.path.isdir(os.path.join(dataset_path, d))]
+        selected_clients = random.sample(all_clients, num_clients)
+
+        print("✅ Selected clients:", selected_clients)
+        selected_paths = [os.path.join(dataset_path, c) for c in selected_clients]
+        return selected_paths

@@ -25,6 +25,7 @@ dataset:
     - ./datasets/mnist160_ver2_1
     - ./datasets/mnist160_ver2_2
   concatenate_datasets: False
+  iid_datasets: True
 
 log_path: .
 
@@ -32,5 +33,6 @@ learning:
   learning-rate: 0.0001
   epochs: 100
   momentum: 0.5
-  batch-size: 16
+  batch-size: 4
   control-count: 3
+  worker: 2

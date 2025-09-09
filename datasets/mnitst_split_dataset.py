@@ -45,4 +45,4 @@ def build_splits_mnist_cls(num_clients=10, alpha=0.5, out_root="mnist_yolo_cls",
                 Image.fromarray(img).save(img_path)
 
     print(f"✅ Dataset saved to {out_root}, with {num_clients} clients (alpha={alpha}), val_size={val_size}")
-build_splits_mnist_cls(num_clients=100, alpha=1, out_root="mnist_yolo_cls_dirichlet", seed=42, val_size=100)
+build_splits_mnist_cls(num_clients=200, alpha=1, out_root="mnist_yolo_cls_dirichlet", seed=42, val_size=100)
