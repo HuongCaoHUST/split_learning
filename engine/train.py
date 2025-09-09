@@ -1590,14 +1590,11 @@ class Split_Learning_ClassificationTrainer(ClassificationTrainer):
     def send_label(self, data_id, labels):
         queue_name = f'label_queue'
         self.channel.queue_declare(queue_name, durable=False)
-        print("Label IDX: ", labels['cls'])
         CLIENT_LABEL_MAP = self.build_client_map(self.model.names)
-        print(CLIENT_LABEL_MAP)
         local_labels = labels["cls"]
         global_labels = [CLIENT_LABEL_MAP[int(l)] for l in local_labels]
         print(f"Local label: {local_labels} -> Global label: {global_labels}")
         labels['cls'] = torch.tensor(global_labels)
-        print("Label IDX 2: ", labels['cls'])
         message = pickle.dumps(
             {"data_id": data_id,
             "label": labels}
