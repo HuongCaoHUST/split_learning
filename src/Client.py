@@ -2,10 +2,8 @@ import time
 import pickle
 import pika
 import random
-import torch
-import torchvision
-import torchvision.transforms as transforms
 from torch import nn
+import src.Utils
 import src.Log
 
 class Client:
@@ -46,30 +44,28 @@ class Client:
                 break
             time.sleep(0.5)
 
-    def read_file(self, file_path):
-        with open(file_path, "rb") as file:
-            return file.read()
-
     def response_message(self, body):
         self.response = pickle.loads(body)
         action = self.response["action"]
         model_path = self.response.get("model_path")
         dataset_path = self.response.get("dataset_path")
         cut_layer = self.response.get("cut_layer")
+        task = self.response.get("task")
         epochs = self.response.get("epochs")
         batch_size = self.response.get("batch_size")
         num_client = self.response.get("num_client")
+        worker = self.response.get("worker")
         valid_epoch_model = self.response.get("valid_epoch_model")
 
         if action == "START":
             src.Log.print_with_color(f"[<<<] Client received: {self.response}", "blue")
             if self.layer_id == 1:
-                result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, epochs, batch_size, self.address, self.username, self.password, valid_epoch_model)
+                result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, task, epochs, batch_size, worker, self.address, self.username, self.password, valid_epoch_model)
             if self.layer_id == 2:
-                result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, epochs, batch_size, self.address, self.username, self.password, valid_epoch_model)
+                result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, task, epochs, batch_size, worker, self.address, self.username, self.password, valid_epoch_model)
             
             if self.virtual_machine:
-                file_data = self.read_file(best)
+                file_data = src.Utils.read_file(best)
                 data = {"action": "UPDATE", "client_id": self.client_id, "layer_id": self.layer_id,
                         "result": result, "message": "Sent parameters to Server", "vm": self.virtual_machine, "best": file_data}
             else:

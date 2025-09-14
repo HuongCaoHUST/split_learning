@@ -1,10 +1,14 @@
 import os
 import pandas as pd
 import yaml
-from ultralytics.data.utils import check_cls_dataset
+import pika
 from pathlib import Path
 
 IMG_FORMATS = {".bmp", ".dng", ".jpeg", ".jpg", ".mpo", ".png", ".tif", ".tiff", ".webp", ".pfm", ".heic"}  # image formats
+
+def read_file(file_path):
+        with open(file_path, "rb") as file:
+            return file.read()
 
 def init_csv(csv_file, headers):
         """
@@ -64,3 +68,18 @@ def calculate_nb(number_images, batch_size):
     Calculate the number of batches
     """
     return (number_images // batch_size)
+
+def connect_rabbitmq(address, username, password):
+        try:
+            credentials = pika.PlainCredentials(username, password)
+            parameters = pika.ConnectionParameters(
+                host=address,
+                port=5672,
+                virtual_host='/',
+                credentials=credentials
+            )
+            connection = pika.BlockingConnection(parameters)
+            channel = connection.channel()
+            return channel
+        except Exception as e:
+            return None

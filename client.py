@@ -67,5 +67,5 @@ if __name__ == "__main__":
     trainning = Trainning(client_id, args.layer_id, channel, device, args.event_time)
     client = Client(client_id, args.layer_id, address, username, password, trainning.train_on_device, device, args.vm)
     client.send_to_server(data)
-    time.sleep(5)
+    time.sleep(8)
     client.wait_response()

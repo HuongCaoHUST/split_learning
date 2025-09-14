@@ -9,11 +9,7 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
-import uuid
-import pika
-import pickle
-import time
-import threading
+
 from ultralytics.nn.autobackend import check_class_names
 from ultralytics.nn.modules import (
     AIFI,
@@ -172,184 +168,23 @@ class BaseModel(torch.nn.Module):
         Returns:
             (torch.Tensor): The last output of the model.
         """
-        dt, embeddings = [], []
+        y, dt, embeddings = [], [], []  # outputs
         embed = frozenset(embed) if embed is not None else {-1}
         max_idx = max(embed)
-        data_store = {}
-        start_layer = self.cut_layer + 1 if self.is_training and self.layer_id == 2 else 0
-
-        max_retries = 1000
-        retry_delay = 1
-        if self.is_training and self.layer_id == 2:
-            queue_name = f'intermediate_queue_{self.layer_id - 1}'
-            for attempt in range(max_retries):
-                method_frame, header_frame, body = self.channel.basic_get(queue=queue_name, auto_ack=True)
-                if method_frame and body:
-                    try:
-                        received_data = pickle.loads(body)
-                        data_store = received_data.get('data_store', {})
-                        self.input_data_id = received_data.get('data_id', 'unknown')
-                        client_id = self.input_data_id.split("_")[0]
-
-                        if client_id in self.client_ids:
-                            index = self.client_ids.index(client_id)
-                            start_layer = self.cut_layer_ids[index] + 1
-                            selected_tensor_id = self.tensor_send_ids[index]
-
-                        print("Start layer: ", start_layer)
-                        print("Selectes_tensor_id: ", selected_tensor_id)
-                        if not any(tid in data_store for tid in selected_tensor_id):
-                            raise ValueError("Layer 2 output not found in data_store")
-                        tensor_id = next(iter(selected_tensor_id))
-                        x = data_store[tensor_id]
-                        if not isinstance(x, torch.Tensor):
-                            raise ValueError("Data from queue is not a valid tensor")
-
-                        self.saved_tensor = {}
-                        y = [None] * len(self.model)
-
-                        # Vòng lặp gán Tensor
-                        for tensor_id in selected_tensor_id:
-                            if tensor_id not in data_store:
-                                raise ValueError(f"Expected tensor_id {tensor_id} not found in data_store")
-                            x = data_store[tensor_id]
-                            if not isinstance(x, torch.Tensor):
-                                raise ValueError(f"Data for tensor_id {tensor_id} is not a valid tensor")
-                            print(f"Received tensor_id {tensor_id}, shape: {x.shape}")
-
-                            x = x.detach().clone().requires_grad_(True)
-                            self.saved_tensor[tensor_id] = x
-                            y[tensor_id] = x
-                        
-                        print(f"Received TENSOR data_id: {self.input_data_id}")
-                        break
-                    except (pickle.UnpicklingError, ValueError) as e:
-                        print(f"Error processing queue data: {e}")
-                        if attempt == max_retries - 1:
-                            raise RuntimeError("Failed to process data from queue after max retries")
-                else:
-                    # print(f"No data received from queue, attempt {attempt + 1}/{max_retries}")
-                    if attempt == max_retries - 1:
-                        raise RuntimeError("Queue is empty after max retries")
-                    time.sleep(retry_delay)
-            else:
-                raise RuntimeError("Failed to retrieve data from queue")
-        else:
-            y = [None] * len(self.model)
-            
-        for m in self.model[start_layer:]:
-            if m.i == self.cut_layer + 1  and self.layer_id == 1:
-                # print(f"Cut layer {m.i} reached, stopping forward pass.")
-                break
-            if m.f != -1:
-                if isinstance(m.f, int):
-                    x = y[m.f]
-                else:
-                    x = [y[j] if j != -1 else x for j in m.f]
+        for m in self.model:
+            if m.f != -1:  # if not from previous layer
+                x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
             if profile:
                 self._profile_one_layer(m, x, dt)
-
-            # print("M.F:", m.f)
-            
-            x = m(x)
-            if m.i in self.save:
-                y[m.i] = x
+            x = m(x)  # run
+            y.append(x if m.i in self.save else None)  # save output
             if visualize:
                 feature_visualization(x, m.type, m.i, save_dir=visualize)
-
-            if self.is_training and m.i in self.tensor_send_ids and self.layer_id == 1:
-                # data_store[m.i] = x.detach().clone().requires_grad_(True)
-                data_store[m.i] = x.detach().requires_grad_(True)
-                print(f"Shape of detached tensor at layer {m.i}: {x.detach().shape}")
-
             if m.i in embed:
-                embeddings.append(torch.nn.functional.adaptive_avg_pool2d(x, (1, 1)).squeeze(-1).squeeze(-1))
+                embeddings.append(torch.nn.functional.adaptive_avg_pool2d(x, (1, 1)).squeeze(-1).squeeze(-1))  # flatten
                 if m.i == max_idx:
                     return torch.unbind(torch.cat(embeddings, 1), dim=0)
-
-        if self.is_training and self.layer_id == 1:
-            self.data_store = data_store
-            data_id = f"{self.client_id}_{uuid.uuid4()}"
-            success = self.send_to_intermediate_queue(data_id, data_store)
-            if not success:
-                print(f"Không thể gửi data_store tới intermediate_queue.")
-
-        self.end_batch_forward_time = time.time()
         return x
-
-    def send_to_intermediate_queue(self, data_id, data_store):
-        queue_name = f'intermediate_queue_{self.layer_id}'
-        self.channel.queue_declare(queue_name, durable=False)
-
-        message = pickle.dumps(
-            {"data_id": data_id,
-            "data_store": data_store}
-        )
-
-        self.channel.basic_publish(
-            exchange='',
-            routing_key=queue_name,
-            body=message
-        )
-
-        print(f"Data_store {data_id} đã được gửi tới {queue_name}, Kích thước: {len(message)} bytes")
-        return True
-    
-    def get_tensor_send_id (self, cut_layer):
-        tensor_send_id = []
-        mf_values = []
-        layer_indices = []
-        for idx, m in enumerate(self.model):
-            f = m.f
-            if f != -1:
-                if isinstance(f, int):
-                    f = [f]
-                for fi in f:
-                    if fi != -1:
-                        layer_indices.append(idx)
-                        mf_values.append(fi)
-        mf_values_sorted = sorted(mf_values)
-
-        for value in mf_values_sorted:
-            if value < cut_layer:
-                tensor_send_id.append(value)
-
-        indices_to_mf = dict(zip(layer_indices, mf_values))
-        for idx, val in indices_to_mf.items():
-            if idx <=cut_layer:
-                tensor_send_id.remove(val)
-
-        tensor_send_id.append(cut_layer)
-        print ("SEND tensor id: ", tensor_send_id)
-        return tensor_send_id
-    
-    
-    def start_thread(self, forward_queue):
-        """START THREADING"""
-        thread = threading.Thread(target=self.check_foward, args= (forward_queue,), daemon=True)
-        thread.start()
-
-    def stop_thread(self):
-        """STOP THREADING"""
-        self.model.is_training = False
-        print(f"Thread đã dừng.")
-
-    def check_foward(self, forward_queue):
-        queue_name = f'intermediate_queue_{self.layer_id - 1}'
-        while True:
-            try:
-                if self.channel is not None and self.channel.is_open:
-                    method_frame, header_frame, body = self.channel.basic_get(queue=queue_name, auto_ack=True)
-                    if method_frame and body:
-                        received_data = pickle.loads(body)
-                        data_id = received_data.get('data_id', {})
-                        print("DATA_ID: ", data_id)
-                else:
-                    print("Thread channel is None or closed")
-            except Exception as e:
-                print("Error in check_forward thread:", e)
-                break
-            time.sleep(0.2)
 
     def _predict_augment(self, x):
         """Perform augmentations on input image x and return augmented inference."""
@@ -535,9 +370,7 @@ class DetectionModel(BaseModel):
         >>> results = model.predict(image_tensor)
     """
 
-    def __init__(self, cfg="yolo11n.yaml", ch=3, nc=None, verbose=True,
-                 layer_id=None, client_id = None, num_client = None, cut_layer = None,
-                 address = None, username = None, password = None):
+    def __init__(self, cfg="yolo11n.yaml", ch=3, nc=None, verbose=True):
         """
         Initialize the YOLO detection model with the given config and parameters.
 
@@ -566,22 +399,6 @@ class DetectionModel(BaseModel):
         self.inplace = self.yaml.get("inplace", True)
         self.end2end = getattr(self.model[-1], "end2end", False)
 
-        self.client_id = client_id
-        self.layer_id = layer_id
-        self.num_client = num_client
-        self.cut_layer = cut_layer if self.layer_id == 1 else cut_layer[0]
-        self.cut_layer_ids = None
-        self.address = address
-        self.username = username
-        self.password = password
-        self.is_training = False
-        self.client_ids = None
-        self.tensor_send_ids = self.get_tensor_send_id(self.cut_layer) if self.layer_id == 1 else []
-        self.data_store=None
-        self.channel = None
-        self.input_data_id = None
-        print(f"Client ID in TASK: {self.client_id}, Layer ID: {self.layer_id}", "Num_client: ", self.num_client,"Cut Layer:", self.cut_layer)
-        print(f"Thông tin RABBITMQ: {self.address}, username: {self.username}, password: {self.password}")
         # Build strides
         m = self.model[-1]  # Detect()
         if isinstance(m, Detect):  # includes all Detect subclasses like Segment, Pose, OBB, YOLOEDetect, YOLOESegment
@@ -605,7 +422,6 @@ class DetectionModel(BaseModel):
 
         # Init weights, biases
         initialize_weights(self)
-
         if verbose:
             self.info()
             LOGGER.info("")

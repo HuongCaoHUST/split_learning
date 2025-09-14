@@ -11,25 +11,28 @@ rabbit:
   password: password
 
 model:
+  task: classify
   model_path: ./yolo11n.pt
   cut_layer: 
-    - 10
-    - 10
+    - 5
+    - 5
   hybrid_training: False
   valid_epoch_model: False
   output_model: ./merged_model.pt
 
 dataset:
   dataset_path:
-    - ./datasets/livingroom_4_1.yaml
-    - ./datasets/livingroom_2.yaml
+    - ./datasets/mnist160
+    - ./datasets/mnist160
   concatenate_datasets: False
+  iid_datasets: False
 
 log_path: .
 
 learning:
   learning-rate: 0.0001
-  epochs: 1
+  epochs: 50
   momentum: 0.5
-  batch-size: 16
+  batch-size: 8
   control-count: 3
+  worker: 4
