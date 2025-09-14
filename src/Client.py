@@ -50,6 +50,7 @@ class Client:
         model_path = self.response.get("model_path")
         dataset_path = self.response.get("dataset_path")
         cut_layer = self.response.get("cut_layer")
+        task = self.response.get("task")
         epochs = self.response.get("epochs")
         batch_size = self.response.get("batch_size")
         num_client = self.response.get("num_client")
@@ -59,9 +60,9 @@ class Client:
         if action == "START":
             src.Log.print_with_color(f"[<<<] Client received: {self.response}", "blue")
             if self.layer_id == 1:
-                result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, epochs, batch_size, worker, self.address, self.username, self.password, valid_epoch_model)
+                result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, task, epochs, batch_size, worker, self.address, self.username, self.password, valid_epoch_model)
             if self.layer_id == 2:
-                result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, epochs, batch_size, worker, self.address, self.username, self.password, valid_epoch_model)
+                result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, task, epochs, batch_size, worker, self.address, self.username, self.password, valid_epoch_model)
             
             if self.virtual_machine:
                 file_data = src.Utils.read_file(best)

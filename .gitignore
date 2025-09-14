@@ -172,3 +172,4 @@ cython_debug/
 /train113
 /best_model_vm
 /log/*
+test_training.py

@@ -79,7 +79,9 @@ class Server:
         self.list_clients = []
 
         # Model
-        self.model_path = config["model"]["model_path"]
+        self.task = config["model"]["task"]
+        # self.model_path = config["model"]["model_path"]
+        self.model_path = self.get_model_path(self.task)
         self.cut_layer = config["model"]["cut_layer"]
         if len(self.total_clients) > len(self.cut_layer):
             self.cut_layer = [self.cut_layer[0] for _ in range(len(self.total_clients))]
@@ -237,6 +239,7 @@ class Server:
                             "message": "Server accept the connection!",
                             "num_client": self.total_clients,
                             "model_path": self.model_path,
+                            "task": self.task,
                             "epochs": self.epochs,
                             "batch_size": self.batch_size,
                             "lr": self.lr,
@@ -280,3 +283,11 @@ class Server:
         print("✅ Selected clients:", selected_clients)
         selected_paths = [os.path.join(dataset_path, c) for c in selected_clients]
         return selected_paths
+    
+    def get_model_path(self, task):
+        MODEL_PATH = {
+            "detect": "./yolo11n.pt",
+            "segment": "./yolo11n-seg.pt",
+            "classify": "./yolo11n-cls.pt",
+        }
+        return MODEL_PATH.get(task, "./yolo11n.pt")

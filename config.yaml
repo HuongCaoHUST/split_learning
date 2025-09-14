@@ -11,8 +11,8 @@ rabbit:
   password: password
 
 model:
+  task: classify
   model_path: ./yolo11n.pt
-  task: SEGMENT
   cut_layer: 
     - 5
     - 5
@@ -22,8 +22,8 @@ model:
 
 dataset:
   dataset_path:
-    - ./datasets/mnist160_ver2_1
-    - ./datasets/mnist160_ver2_2
+    - ./datasets/mnist160
+    - ./datasets/mnist160
   concatenate_datasets: False
   iid_datasets: False
 
@@ -31,7 +31,7 @@ log_path: .
 
 learning:
   learning-rate: 0.0001
-  epochs: 100
+  epochs: 50
   momentum: 0.5
   batch-size: 8
   control-count: 3

@@ -25,16 +25,23 @@ class Trainning:
                                    routing_key='Server_queue',
                                    body=pickle.dumps(message))
 
-    def train_on_first_layer(self, model_path, dataset_path, num_client, cut_layer, epochs, batch_size, worker, address = None, username = None, password = None, valid_epoch_model = -1):
+    def train_on_first_layer(self, model_path, dataset_path, num_client, cut_layer, task, epochs, batch_size, worker, address = None, username = None, password = None, valid_epoch_model = -1):
         src.Log.print_with_color("--- START TRAINING FIRST LAYER ---", "green")
-        args = dict(model="./yolo11n-cls.pt",
+
+        TRAINER = {
+            "detect": Split_Learning_DetectionTrainer,
+            "segment": Split_Learning_SegmentationTrainer,
+            "classify": Split_Learning_ClassificationTrainer,
+        }
+        TrainerClass = TRAINER.get(task)
+        args = dict(model=model_path,
                     data=dataset_path,
                     epochs=epochs,
                     batch=batch_size,
                     project = './runs/detect',
                     workers = worker,
                     save_period = valid_epoch_model)
-        trainer = Split_Learning_ClassificationTrainer(overrides=args, client_id=self.client_id,
+        trainer = TrainerClass(overrides=args, client_id=self.client_id,
                                          layer_id=self.layer_id, num_client=num_client,
                                          cut_layer=cut_layer, address=address, username=username, password=password)
         trainer.train()
@@ -56,7 +63,7 @@ class Trainning:
                 break
             time.sleep(0.5)
 
-    def train_on_last_layer(self, model_path, dataset_path, num_client, cut_layer, epochs, batch_size, worker, address = None, username = None, password = None, valid_epoch_model = -1):
+    def train_on_last_layer(self, model_path, dataset_path, num_client, cut_layer, task, epochs, batch_size, worker, address = None, username = None, password = None, valid_epoch_model = -1):
         queue_name = f'label_queue'
         result = True
         self.channel.queue_declare(queue=queue_name, durable=False)
@@ -65,8 +72,15 @@ class Trainning:
         print('Waiting for intermediate output. To exit press CTRL+C')
 
         src.Log.print_with_color("--- START TRAINING SECOND LAYER ---", "green")
-        args = dict(model="./yolo11n-cls.pt",
-                    data="./datasets/mnist160",
+
+        TRAINER = {
+            "detect": Split_Learning_DetectionTrainer,
+            "segment": Split_Learning_SegmentationTrainer,
+            "classify": Split_Learning_ClassificationTrainer,
+        }
+        TrainerClass = TRAINER.get(task)
+        args = dict(model=model_path,
+                    data=dataset_path,
                     epochs=epochs,
                     batch=batch_size,
                     project = './runs/detect',
@@ -74,7 +88,7 @@ class Trainning:
                     save_period = valid_epoch_model
                     # optimizer='AdamW',
                     )
-        trainer = Split_Learning_ClassificationTrainer(overrides=args, client_id=self.client_id,
+        trainer = TrainerClass(overrides=args, client_id=self.client_id,
                                          layer_id=self.layer_id, num_client=num_client,
                                          cut_layer=cut_layer, address=address, username=username, password=password)
         trainer.train()
@@ -97,7 +111,7 @@ class Trainning:
                 break
             time.sleep(0.5)
                     
-    def train_on_device(self, model_path, dataset_path, num_client,cut_layer, epochs, batch_size, worker, address, username, password, valid_epoch_model):
+    def train_on_device(self, model_path, dataset_path, num_client,cut_layer, task, epochs, batch_size, worker, address, username, password, valid_epoch_model):
         self.data_count = 0
         if self.layer_id == 1:
 
@@ -106,7 +120,7 @@ class Trainning:
             self.channel.queue_declare(queue=forward_queue_name, durable=False)
             self.channel.basic_qos(prefetch_count=10)
 
-            result = self.train_on_first_layer(model_path, dataset_path, num_client,cut_layer, epochs, batch_size, worker, address, username, password, valid_epoch_model)
+            result = self.train_on_first_layer(model_path, dataset_path, num_client,cut_layer, task, epochs, batch_size, worker, address, username, password, valid_epoch_model)
 
         elif self.layer_id == 2:
             # Create intermediate queue
@@ -119,7 +133,7 @@ class Trainning:
             self.channel.queue_declare(queue=forward_queue_name, durable=False)
             self.channel.basic_qos(prefetch_count=10)
             
-            result = self.train_on_last_layer(model_path, dataset_path, num_client,cut_layer, epochs, batch_size, worker, address, username, password, valid_epoch_model)
+            result = self.train_on_last_layer(model_path, dataset_path, num_client, cut_layer, task, epochs, batch_size, worker, address, username, password, valid_epoch_model)
 
         if self.event_time:
             src.Log.print_with_color(f"Training time events {self.time_event}", "yellow")
