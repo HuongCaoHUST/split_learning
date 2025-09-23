@@ -12,6 +12,7 @@ from requests.auth import HTTPBasicAuth
 import src.Log
 import src.Utils
 from src.Validation import ModelValidator
+from src.Utils import split_dataset
 
 def delete_old_queues(address, username, password):
     url = f'http://{address}:15672/api/queues'
@@ -91,6 +92,9 @@ class Server:
 
         #Dataset
         self.dataset_path = config["dataset"]["dataset_path"] if not config["dataset"]["iid_datasets"] else self.random_dataset(num_clients=self.total_clients[0])
+        self.dataset_path = src.Utils.split_dataset(yaml_path=self.dataset_path[0], num_client=self.total_clients[0])
+        print("Dataset paths for clients:", self.dataset_path)
+
         if len(self.total_clients) > len(self.dataset_path):
             self.dataset_path = [self.dataset_path[0] for _ in range(len(self.total_clients))]
         # self.nb_client = src.Utils.check_dataset(self.dataset_path, self.batch_size)

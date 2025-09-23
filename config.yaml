@@ -11,7 +11,7 @@ rabbit:
   password: password
 
 model:
-  task: classify
+  task: detect
   model_path: ./yolo11n.pt
   cut_layer: 
     - 5
@@ -22,7 +22,7 @@ model:
 
 dataset:
   dataset_path:
-    - ./datasets/mnist160
+    - ./datasets/livingroom_1200pic/data.yaml
     - ./datasets/mnist160
   concatenate_datasets: False
   iid_datasets: False

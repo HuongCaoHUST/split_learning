@@ -3,6 +3,7 @@ import pandas as pd
 import yaml
 import pika
 from pathlib import Path
+import shutil
 
 IMG_FORMATS = {".bmp", ".dng", ".jpeg", ".jpg", ".mpo", ".png", ".tif", ".tiff", ".webp", ".pfm", ".heic"}  # image formats
 
@@ -83,3 +84,66 @@ def connect_rabbitmq(address, username, password):
             return channel
         except Exception as e:
             return None
+        
+import shutil
+import yaml
+from pathlib import Path
+
+def split_dataset(yaml_path, num_client=5):
+    yaml_paths = [] 
+    src_root = Path(yaml_path).parent
+
+    src_train_images = src_root / "train" / "images"
+    src_train_labels = src_root / "train" / "labels"
+    src_val_images = src_root / "valid" / "images"
+    src_val_labels = src_root / "valid" / "labels"
+
+    dst_base = Path("./datasets/clients")
+    with open(yaml_path, "r", encoding="utf-8") as f:
+        yaml_data = yaml.safe_load(f)
+
+    # Lấy danh sách ảnh train
+    images = sorted([f for f in src_train_images.iterdir() if f.is_file()])
+    images_per_client = len(images) // num_client
+
+    for i in range(num_client):
+        client_dir = dst_base / f"client{i+1}"
+        train_img_dir = client_dir / "train" / "images"
+        train_lbl_dir = client_dir / "train" / "labels"
+        val_img_dir = client_dir / "valid" / "images"
+        val_lbl_dir = client_dir / "valid" / "labels"
+
+        # Tạo thư mục cần thiết
+        train_img_dir.mkdir(parents=True, exist_ok=True)
+        train_lbl_dir.mkdir(parents=True, exist_ok=True)
+        val_img_dir.mkdir(parents=True, exist_ok=True)
+        val_lbl_dir.mkdir(parents=True, exist_ok=True)
+
+        start = i * images_per_client
+        end = (i + 1) * images_per_client
+        client_images = images[start:end]
+
+        for img in client_images:
+            shutil.copy(img, train_img_dir)
+            label_file = src_train_labels / (img.stem + ".txt")
+            if label_file.exists():
+                shutil.copy(label_file, train_lbl_dir)
+        for img in src_val_images.iterdir():
+            if img.is_file():
+                shutil.copy(img, val_img_dir)
+                label_file = src_val_labels / (img.stem + ".txt")
+                if label_file.exists():
+                    shutil.copy(label_file, val_lbl_dir)
+        client_yaml = yaml_data.copy()
+        client_yaml["train"] = "../train/images"
+        client_yaml["val"] = "../valid/images"
+        client_yaml["test"] = "../test/images"
+
+        out_yaml = client_dir / "data.yaml"
+        with open(out_yaml, "w", encoding="utf-8") as f:
+            yaml.dump(client_yaml, f, sort_keys=False, allow_unicode=True)
+        rel_path = Path("./datasets") / out_yaml.relative_to(Path("./datasets"))
+        yaml_paths.append(str(rel_path))
+        print(f"✅ Client {i+1}: {len(client_images)} ảnh train + {len(list(src_val_images.iterdir()))} ảnh val + file yaml")
+
+    return yaml_paths
