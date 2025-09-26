@@ -173,3 +173,7 @@ cython_debug/
 /best_model_vm
 /log/*
 test_training.py
+*.csv
+*.png
+*.xlsx
+*.jpg
