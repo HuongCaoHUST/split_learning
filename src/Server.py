@@ -81,8 +81,8 @@ class Server:
 
         # Model
         self.task = config["model"]["task"]
-        # self.model_path = config["model"]["model_path"]
-        self.model_path = self.get_model_path(self.task)
+        self.model_path = config["model"]["model_path"]
+        # self.model_path = self.get_model_path(self.task)
         self.cut_layer = config["model"]["cut_layer"]
         if len(self.total_clients) > len(self.cut_layer):
             self.cut_layer = [self.cut_layer[0] for _ in range(len(self.total_clients))]
@@ -92,7 +92,7 @@ class Server:
 
         #Dataset
         self.dataset_path = config["dataset"]["dataset_path"] if not config["dataset"]["iid_datasets"] else self.random_dataset(num_clients=self.total_clients[0])
-        self.dataset_path = src.Utils.split_dataset(yaml_path=self.dataset_path[0], num_client=self.total_clients[0])
+        # self.dataset_path = src.Utils.split_dataset(yaml_path=self.dataset_path[0], num_client=self.total_clients[0])
         print("Dataset paths for clients:", self.dataset_path)
 
         if len(self.total_clients) > len(self.dataset_path):
@@ -242,7 +242,6 @@ class Server:
                 response = {"action": "START",
                             "message": "Server accept the connection!",
                             "num_client": self.total_clients,
-                            "model_path": self.model_path,
                             "task": self.task,
                             "epochs": self.epochs,
                             "batch_size": self.batch_size,
@@ -252,6 +251,7 @@ class Server:
                             "valid_epoch_model": self.valid_epoch_model}
                 
                 if layer_id == 1:
+                    response["model_path"] = self.model_path[0]
                     response["cut_layer"] = self.cut_layer[dataset_index]
                     response["dataset_path"] = self.dataset_path[dataset_index]
                     if self.concatenate_datasets and dataset_index !=0:
@@ -260,6 +260,7 @@ class Server:
                         response["delta_nc"] = delta_nc
                     dataset_index += 1
                 elif layer_id == 2:
+                    response["model_path"] = self.model_path[1]
                     response["cut_layer"] = self.cut_layer[0]
                     response["dataset_path"] = self.dataset_path[0]
 

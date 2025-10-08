@@ -12,18 +12,20 @@ rabbit:
 
 model:
   task: detect
-  model_path: ./yolo11n.pt
+  model_path:
+    - ./yolo11s.pt
+    - ./yolo11s.pt
   cut_layer: 
-    - 5
-    - 5
+    - 10
+    - 10
   hybrid_training: False
   valid_epoch_model: False
   output_model: ./merged_model.pt
 
 dataset:
   dataset_path:
-    - ./datasets/livingroom_1200pic/data.yaml
-    - ./datasets/mnist160
+    - ./datasets/livingroom_4_1.yaml
+    - ./datasets/livingroom_4_2.yaml
   concatenate_datasets: False
   iid_datasets: False
 
@@ -35,4 +37,4 @@ learning:
   momentum: 0.5
   batch-size: 8
   control-count: 3
-  worker: 4
+  worker: 8
