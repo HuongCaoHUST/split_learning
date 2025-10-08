@@ -13,8 +13,8 @@ rabbit:
 model:
   task: detect
   model_path:
-    - ./yolo11s.pt
-    - ./yolo11s.pt
+    - ./yolo11s_custom.yaml
+    - ./yolo11s_custom.yaml
   cut_layer: 
     - 10
     - 10

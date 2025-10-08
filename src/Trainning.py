@@ -79,7 +79,7 @@ class Trainning:
             "classify": Split_Learning_ClassificationTrainer,
         }
         TrainerClass = TRAINER.get(task)
-        args = dict(model=model_path,
+        args = dict(model="./yolo11s.pt",
                     data=dataset_path,
                     epochs=epochs,
                     batch=batch_size,

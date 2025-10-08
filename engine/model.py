@@ -462,7 +462,7 @@ class Split_Learning_DetectionModel(DetectionModel):
             }
         )
         if layer_id == 1:
-            for i, (f, n, m, args) in enumerate(d["backbone"] + d["head"]):  # from, number, module, args
+            for i, (f, n, m, args) in enumerate(d["backbone"]):  # from, number, module, args
                 m = (
                     getattr(torch.nn, m[3:])
                     if "nn." in m
