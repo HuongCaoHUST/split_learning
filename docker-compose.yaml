@@ -59,13 +59,13 @@ services:
       - .:/app
     working_dir: /app
     command: ["python", "client.py", "--layer_id", "1", "--docker"]
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
   client_1_2:
     container_name: split_learning_client_1_2
     image: split_learning-server

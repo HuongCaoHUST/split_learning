@@ -55,6 +55,7 @@ class Client:
         batch_size = self.response.get("batch_size")
         num_client = self.response.get("num_client")
         worker = self.response.get("worker")
+        load_partial_model = self.response.get("load_partial_model")
         valid_epoch_model = self.response.get("valid_epoch_model")
 
         if action == "START":

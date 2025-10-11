@@ -81,7 +81,11 @@ class Server:
 
         # Model
         self.task = config["model"]["task"]
-        self.model_path = config["model"]["model_path"]
+        self.load_partial_model = config["model"]["load_partial_model"]
+        if self.load_partial_model:
+            self.model_path = config["model"]["model_path_partial"]
+        else:
+            self.model_path = config["model"]["model_path"]
         # self.model_path = self.get_model_path(self.task)
         self.cut_layer = config["model"]["cut_layer"]
         if len(self.total_clients) > len(self.cut_layer):
@@ -248,6 +252,7 @@ class Server:
                             "lr": self.lr,
                             "momentum": self.momentum,
                             "worker": self.worker,
+                            "load_partial_model": self.load_partial_model,
                             "valid_epoch_model": self.valid_epoch_model}
                 
                 if layer_id == 1:

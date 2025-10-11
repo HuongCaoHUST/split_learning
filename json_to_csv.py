@@ -2,8 +2,8 @@ import pandas as pd
 import json
 
 # Đọc file json lines
-input_file = "./docker_stats.json"
-output_file = "./docker_stats_5.csv"
+input_file = "./train_10_10/gpu_processes.json"
+output_file = "./train_10_10/gpu_processes.csv"
 
 # Đọc từng dòng và parse json
 records = []

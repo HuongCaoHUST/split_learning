@@ -3,8 +3,14 @@ import json
 import time
 from datetime import datetime
 
-DOCKER_LOG_FILE = "./docker_stats.json"
-GPU_PROC_LOG_FILE = "./gpu_processes.json"
+def get_next_log_filename(base_name, ext="json"):
+    i = 1
+    while os.path.exists(f"{base_name}_{i}.{ext}"):
+        i += 1
+    return f"{base_name}_{i}.{ext}"
+
+DOCKER_LOG_FILE = get_next_log_filename("docker_stats")
+GPU_PROC_LOG_FILE = get_next_log_filename("gpu_processes")
 
 def log_docker_stats():
     output = os.popen('docker stats --no-stream --format "{{json .}}"').read().strip().splitlines()
@@ -16,10 +22,11 @@ def log_docker_stats():
             stats_list.append(data)
         except json.JSONDecodeError:
             continue
+
     with open(DOCKER_LOG_FILE, "a", encoding="utf-8") as f:
         for stat in stats_list:
             f.write(json.dumps(stat) + "\n")
-    print(f"[{datetime.now().isoformat()}] Logged {len(stats_list)} Docker containers")
+    print(f"[{datetime.now().isoformat()}] Logged {len(stats_list)} Docker containers -> {DOCKER_LOG_FILE}")
 
 def log_gpu_processes():
     gpu_output = os.popen(
@@ -43,7 +50,7 @@ def log_gpu_processes():
         for stat in proc_stats:
             f.write(json.dumps(stat) + "\n")
 
-    print(f"[{datetime.now().isoformat()}] Logged {len(proc_stats)} GPU processes")
+    print(f"[{datetime.now().isoformat()}] Logged {len(proc_stats)} GPU processes -> {GPU_PROC_LOG_FILE}")
 
 if __name__ == "__main__":
     while True:

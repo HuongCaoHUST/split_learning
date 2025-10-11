@@ -899,6 +899,8 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
             return [16, 19, cut_layer]
         elif cut_layer == 22:
             return [16, 19, cut_layer]
+        elif cut_layer == 23:
+            return [16, 19, 22]
 
     def send_epoch_intermediate(self, epoch_intermediate_path = None):
         queue_name = f'Server_queue'

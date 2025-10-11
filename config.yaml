@@ -12,9 +12,12 @@ rabbit:
 
 model:
   task: detect
+  load_partial_model: True
   model_path:
-    - ./yolo11s_custom.yaml
-    - ./yolo11s_custom.yaml
+    - ./yolo11n.pt
+  model_path_partial:
+    - ./yolo11n_custom.yaml
+    - ./yolo11n_custom.yaml
   cut_layer: 
     - 10
     - 10
@@ -33,7 +36,7 @@ log_path: .
 
 learning:
   learning-rate: 0.0001
-  epochs: 50
+  epochs: 1
   momentum: 0.5
   batch-size: 8
   control-count: 3
