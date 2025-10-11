@@ -15,6 +15,9 @@ def init_csv(csv_file, headers):
         """
         Init csv log file
         """
+        folder = os.path.dirname(csv_file)
+        if folder:
+            os.makedirs(folder, exist_ok=True)
         df = pd.DataFrame(columns=headers)
         df.to_csv(csv_file, index=False)
 

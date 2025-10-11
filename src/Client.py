@@ -61,9 +61,9 @@ class Client:
         if action == "START":
             src.Log.print_with_color(f"[<<<] Client received: {self.response}", "blue")
             if self.layer_id == 1:
-                result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, task, epochs, batch_size, worker, self.address, self.username, self.password, valid_epoch_model)
+                result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, task, epochs, batch_size, worker, self.address, self.username, self.password, load_partial_model, valid_epoch_model)
             if self.layer_id == 2:
-                result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, task, epochs, batch_size, worker, self.address, self.username, self.password, valid_epoch_model)
+                result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, task, epochs, batch_size, worker, self.address, self.username, self.password, load_partial_model, valid_epoch_model)
             
             if self.virtual_machine:
                 file_data = src.Utils.read_file(best)

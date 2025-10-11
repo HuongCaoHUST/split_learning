@@ -73,7 +73,7 @@ from ultralytics.nn.modules import (
 class Split_Learning_DetectionModel(DetectionModel):
     def __init__(self, cfg=None, nc=None, ch=3, verbose=True, 
                  layer_id=None, client_id=None, num_client=None, cut_layer=None,
-                 address=None, username=None, password=None):
+                 address=None, username=None, password=None, load_partial_model = False):
         self.layer_id = layer_id
         self.client_id = client_id
         self.num_client = num_client
@@ -83,7 +83,7 @@ class Split_Learning_DetectionModel(DetectionModel):
         self.address = address
         self.username = username
         self.password = password
-
+        self.load_partial_model = load_partial_model
         self.is_training = False
         self.client_ids = None
         super(BaseModel, self).__init__()
@@ -100,7 +100,7 @@ class Split_Learning_DetectionModel(DetectionModel):
         if nc and nc != self.yaml["nc"]:
             LOGGER.info(f"Overriding model.yaml nc={self.yaml['nc']} with nc={nc}")
             self.yaml["nc"] = nc  
-        self.model, self.save = self.parse_model_SL(deepcopy(self.yaml), ch=ch, verbose=verbose, layer_id=self.layer_id)
+        self.model, self.save = self.parse_model_SL(deepcopy(self.yaml), ch=ch, verbose=verbose, layer_id=self.layer_id, cut_layer=self.cut_layer, load_partial_model=self.load_partial_model)
 
         self.names = {i: f"{i}" for i in range(self.yaml["nc"])}  
         self.inplace = self.yaml.get("inplace", True)
@@ -250,8 +250,6 @@ class Split_Learning_DetectionModel(DetectionModel):
             success = self.send_to_intermediate_queue(data_id, data_store)
             if not success:
                 print(f"Không thể gửi data_store tới intermediate_queue.")
-
-        self.end_batch_forward_time = time.time()
         return x
     
     def send_to_intermediate_queue(self, data_id, data_store):
@@ -369,7 +367,7 @@ class Split_Learning_DetectionModel(DetectionModel):
                 break
             time.sleep(0.2)
 
-    def parse_model_SL(self, d, ch, verbose=True, layer_id = None):
+    def parse_model_SL(self, d, ch, verbose=True, layer_id = None, cut_layer = None, load_partial_model = False):
         """
         Parse a YOLO model.yaml dictionary into a PyTorch model.
 
@@ -461,7 +459,7 @@ class Split_Learning_DetectionModel(DetectionModel):
                 A2C2f,
             }
         )
-        if layer_id == 1:
+        if layer_id == 1 and cut_layer is not None and (cut_layer <= len(d["backbone"])-1) and load_partial_model:
             for i, (f, n, m, args) in enumerate(d["backbone"]):  # from, number, module, args
                 m = (
                     getattr(torch.nn, m[3:])

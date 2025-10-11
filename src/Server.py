@@ -265,7 +265,7 @@ class Server:
                         response["delta_nc"] = delta_nc
                     dataset_index += 1
                 elif layer_id == 2:
-                    response["model_path"] = self.model_path[1]
+                    response["model_path"] = self.model_path[0]
                     response["cut_layer"] = self.cut_layer[0]
                     response["dataset_path"] = self.dataset_path[0]
 

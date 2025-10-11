@@ -53,7 +53,7 @@ from ultralytics.utils.torch_utils import (
 import threading
 
 class Split_Learning_DetectionTrainer(DetectionTrainer):
-    def __init__(self, overrides, client_id=None, layer_id=None, num_client=None, cut_layer=None, address=None, username=None, password=None):
+    def __init__(self, overrides, client_id=None, layer_id=None, num_client=None, cut_layer=None, address=None, username=None, password=None, load_partial_model=False):
         self.client_id = client_id
         self.layer_id = layer_id
         self.num_client = num_client
@@ -62,7 +62,8 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
         self.address = address
         self.username = username
         self.password = password
-        Utils.init_csv('./log/log_time.csv', ['layer_id', 'client_id', 'epoch', 'forward/backward/end_epoch', 'duration'])
+        self.load_partial_model = load_partial_model
+        Utils.init_csv('./log/latency.csv', ['batch_id', 'start', 'end', 'latency'])
         self.status_train = False
         self.count_batch = 0
         if self.layer_id == 1:
@@ -102,7 +103,8 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                             cut_layer=getattr(self, 'cut_layer', None),
                             address=getattr(self, 'address', None),
                             username=getattr(self, 'username', None),
-                            password=getattr(self, 'password', None))
+                            password=getattr(self, 'password', None),
+                            load_partial_model=getattr(self, 'load_partial_model', False))
         if weights:
             model.load(weights)
         return model
@@ -326,7 +328,6 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                     self.start_thread()
                 #Training loop   
                 for i, batch in pbar:
-                    start_batch_forward_time = time.time()
                     self.run_callbacks("on_train_batch_start")
                     # Warmup
                     ni = i + nb * epoch
@@ -343,22 +344,24 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                     # Forward
                     with autocast(self.amp):
                         batch = self.preprocess_batch(batch)
+                        label_data = {
+                            "batch_idx": batch["batch_idx"],
+                            "bboxes": batch["bboxes"],
+                            "cls": batch["cls"]
+                        }
                         if self.layer_id == 1:
                             data_id = uuid.uuid4()
-                            success = self.send_label(data_id, batch)
+                            success = self.send_label(data_id, label_data)
+                            start_batch_time = time.time()
                             if not success:
                                 print(f"Không thể gửi batch {i} tới label_queue.")
 
                         # Forward in task
                         preds = self.model(batch["img"])
 
-                        duration = round(self.model.end_batch_forward_time - start_batch_forward_time, 2)
-                        Utils.log_to_csv('./log/log_time.csv', {
-                            'layer_id': self.layer_id,
-                            'client_id': self.client_id,
-                            'epoch': epoch+1,
-                            'forward/backward/end_epoch': 'forward',
-                            'duration': round(duration, 2)
+                        Utils.log_to_csv('./log/latency.csv', {
+                            'batch_id': data_id,
+                            'start': self.client_id,
                         })
 
                     # Log
@@ -372,16 +375,6 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                 self.wait_all_backward(expected_num=nb)
 
                 self.lr = {f"lr/pg{ir}": x["lr"] for ir, x in enumerate(self.optimizer.param_groups)}  # for loggers
-
-                end_epoch_time = time.time()
-                duration = round(end_epoch_time - start_epoch_time, 2)
-                Utils.log_to_csv('./log/log_time.csv', {
-                    'layer_id': self.layer_id,
-                    'client_id': self.client_id,
-                    'epoch': epoch+1,
-                    'forward/backward/end_epoch': 'end_epoch',
-                    'duration': round(duration, 2)
-                })
                 self.run_callbacks("on_train_epoch_end")
                 if RANK in {-1, 0}:
                     final_epoch = epoch + 1 >= self.epochs
@@ -456,9 +449,12 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                             if "momentum" in x:
                                 x["momentum"] = np.interp(ni, xi, [self.args.warmup_momentum, self.args.momentum])
                     batch = self.wait_for_batch()
+
+                    # print("Batch received" , batch["batch_idx"])
                     # Forward
                     with autocast(self.amp):
-                        batch = self.preprocess_batch(batch)
+                        # batch = self.preprocess_batch(batch)
+                        batch["img"] = torch.zeros((1, 3, 640, 640)).to(self.device)
                         loss, self.loss_items = self.model(batch)
                         self.loss = loss.sum()
                         if RANK != -1:
@@ -467,16 +463,7 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                             (self.tloss * i + self.loss_items) / (i + 1) if self.tloss is not None else self.loss_items
                         )
 
-                    duration = round(self.model.end_batch_forward_time - start_batch_forward_time, 2)
-                    Utils.log_to_csv('./log/log_time.csv', {
-                        'layer_id': self.layer_id,
-                        'client_id': self.client_id,
-                        'epoch': epoch+1,
-                        'forward/backward/end_epoch': 'forward',
-                        'duration': round(duration, 2)
-                    })
                     # Backward
-                    start_batch_backward_time = time.time()
                     self.scaler.scale(self.loss).backward()
 
                     if self.layer_id == 2:
@@ -517,17 +504,6 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                                 self.stop = broadcast_list[0]
                             if self.stop:  # training time exceeded
                                 break
-                    
-                    # Log time
-                    end_batch_backward_time = time.time()
-                    duration = round(end_batch_backward_time - start_batch_backward_time, 2)
-                    Utils.log_to_csv('./log/log_time.csv', {
-                        'layer_id': self.layer_id,
-                        'client_id': self.client_id,
-                        'epoch': epoch+1,
-                        'forward/backward/end_epoch': 'backward',
-                        'duration': round(duration, 2)
-                    })
 
                     # Log
                     if RANK in {-1, 0}:
@@ -543,8 +519,8 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                             )
                         )
                         self.run_callbacks("on_batch_end")
-                        if self.args.plots and ni in self.plot_idx:
-                            self.plot_training_samples(batch, ni)
+                        # if self.args.plots and ni in self.plot_idx:
+                        #     self.plot_training_samples(batch, ni)
 
                     self.run_callbacks("on_train_batch_end")
 
@@ -802,14 +778,10 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                                 break
 
                         # Log
-                        end_batch_backward_time = time.time()
-                        duration = round(end_batch_backward_time - start_batch_backward_time, 2)
-                        Utils.log_to_csv('./log/log_time.csv', {
-                            'layer_id': self.layer_id,
-                            'client_id': self.client_id,
-                            'epoch': self.epoch + 1,
-                            'forward/backward/end_epoch': 'backward',
-                            'duration': round(duration, 2)
+                        end_batch_time = time.time()
+                        Utils.log_to_csv('./log/latency.csv', {
+                            'batch_id': data_id,
+                            'end': end_batch_time
                         })
                 else:
                     print("Thread channel is None or closed")
