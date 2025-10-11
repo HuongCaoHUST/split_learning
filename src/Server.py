@@ -12,7 +12,7 @@ from requests.auth import HTTPBasicAuth
 import src.Log
 import src.Utils
 from src.Validation import ModelValidator
-from src.Utils import split_dataset
+from src.Utils import split_dataset, calculate_latency
 
 def delete_old_queues(address, username, password):
     url = f'http://{address}:15672/api/queues'
@@ -222,6 +222,9 @@ class Server:
                 print("BEST_2.pt:", self.val_function.best_model_2)
                 if len(self.val_function.best_model_layer_1) == self.total_clients[0] and len(self.val_function.best_model_2) == self.total_clients[1]:
                     self.val_function.validate_best_model()
+
+                self.val_function.validate_epoch_model()
+                src.Utils.calculate_latency()
                 sys.exit()
 
         # Ack the message

@@ -10,7 +10,7 @@ def get_next_log_filename(base_name, ext="json"):
     return f"{base_name}_{i}.{ext}"
 
 DOCKER_LOG_FILE = get_next_log_filename("docker_stats")
-GPU_PROC_LOG_FILE = get_next_log_filename("gpu_processes")
+GPU_PROC_LOG_FILE = get_next_log_filename("gpu_stats")
 
 def log_docker_stats():
     output = os.popen('docker stats --no-stream --format "{{json .}}"').read().strip().splitlines()

@@ -64,6 +64,7 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
         self.password = password
         self.load_partial_model = load_partial_model
         Utils.init_csv('./log/latency.csv', ['batch_id', 'start', 'end', 'latency'])
+        Utils.init_csv('./log/com_cost.csv', ['batch_id', 'label/tensor', 'size'])
         self.status_train = False
         self.count_batch = 0
         if self.layer_id == 1:
@@ -351,6 +352,7 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                         }
                         if self.layer_id == 1:
                             data_id = uuid.uuid4()
+                            self.model.batch_id = data_id
                             success = self.send_label(data_id, label_data)
                             start_batch_time = time.time()
                             if not success:
@@ -361,7 +363,7 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
 
                         Utils.log_to_csv('./log/latency.csv', {
                             'batch_id': data_id,
-                            'start': self.client_id,
+                            'start': start_batch_time,
                         })
 
                     # Log
@@ -603,6 +605,12 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
             body=message
         )
 
+        Utils.log_to_csv('./log/com_cost.csv', {
+                            'batch_id': data_id,
+                            'label/tensor': "label",
+                            'size': len(message)
+                        })
+
         print(f"Batch {data_id} đã được gửi tới {queue_name}, Kích thước: {len(message)} bytes")
         return True
     
@@ -780,7 +788,8 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                         # Log
                         end_batch_time = time.time()
                         Utils.log_to_csv('./log/latency.csv', {
-                            'batch_id': data_id,
+                            'batch_id': data_id.split("_")[1],
+                            'start': "Null",
                             'end': end_batch_time
                         })
                 else:
@@ -1620,7 +1629,6 @@ class Split_Learning_ClassificationTrainer(ClassificationTrainer):
             routing_key=queue_name,
             body=message
         )
-
         print(f"Batch {data_id} đã được gửi tới {queue_name}, Kích thước: {len(message)} bytes")
         return True
     

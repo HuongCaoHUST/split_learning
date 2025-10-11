@@ -24,7 +24,7 @@ class ModelValidator:
         # validator()
         print("Test cuối; dataset: ", self.dataset_path[0])
         model = YOLO(merge_model)
-        metrics = model.val(data="./datasets/mnist160")
+        metrics = model.val(data="./datasets/livingroom_4_1.yaml")
         print("metrics: ", metrics)
         return True
     

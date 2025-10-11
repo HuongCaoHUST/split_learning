@@ -11,6 +11,7 @@ from ultralytics.utils.plotting import feature_visualization
 from ultralytics.utils.ops import make_divisible
 from ultralytics.utils import LOGGER, colorstr
 import contextlib
+from src import Utils
 from ultralytics.nn.modules import (
     AIFI,
     C1,
@@ -86,6 +87,7 @@ class Split_Learning_DetectionModel(DetectionModel):
         self.load_partial_model = load_partial_model
         self.is_training = False
         self.client_ids = None
+        self.batch_id = None
         super(BaseModel, self).__init__()
         self.yaml = cfg if isinstance(cfg, dict) else yaml_model_load(cfg)  # cfg dict
         if self.yaml["backbone"][0][2] == "Silence":
@@ -246,7 +248,7 @@ class Split_Learning_DetectionModel(DetectionModel):
 
         if self.is_training and self.layer_id == 1:
             self.data_store = data_store
-            data_id = f"{self.client_id}_{uuid.uuid4()}"
+            data_id = f"{self.client_id}_{self.batch_id}"
             success = self.send_to_intermediate_queue(data_id, data_store)
             if not success:
                 print(f"Không thể gửi data_store tới intermediate_queue.")
@@ -266,6 +268,12 @@ class Split_Learning_DetectionModel(DetectionModel):
             routing_key=queue_name,
             body=message
         )
+
+        Utils.log_to_csv('./log/com_cost.csv', {
+                            'batch_id': data_id,
+                            'label/tensor': "tensor",
+                            'size': len(message)
+                        })
 
         print(f"Data_store {data_id} đã được gửi tới {queue_name}, Kích thước: {len(message)} bytes")
         return True

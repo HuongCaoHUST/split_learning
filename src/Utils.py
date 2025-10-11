@@ -150,3 +150,27 @@ def split_dataset(yaml_path, num_client=5):
         print(f"✅ Client {i+1}: {len(client_images)} ảnh train + {len(list(src_val_images.iterdir()))} ảnh val + file yaml")
 
     return yaml_paths
+
+def calculate_latency():
+    import pandas as pd
+    df = pd.read_csv("./log/latency.csv")
+    df = df.replace("Null", pd.NA)
+    df["start"] = pd.to_numeric(df["start"], errors="coerce")
+    df["end"] = pd.to_numeric(df["end"], errors="coerce")
+    latencies = []
+    start_dict = {}
+
+    for _, row in df.iterrows():
+        batch_id = row["batch_id"]
+        start = row["start"]
+        end = row["end"]
+        
+        if pd.notna(start):
+            start_dict[batch_id] = start
+        elif pd.notna(end) and batch_id in start_dict:
+            latency = end - start_dict[batch_id]
+            latencies.append({"batch_id": batch_id, "latency": latency})
+            del start_dict[batch_id]
+    latency_df = pd.DataFrame(latencies)
+    latency_df.to_csv("./log/latency_results.csv", index=False)
+    print("Log latency to log/latency_results.csv")
