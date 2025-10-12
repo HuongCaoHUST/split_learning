@@ -689,6 +689,11 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
             routing_key=queue_name,
             body=message
         )
+        Utils.log_to_csv('./log/com_cost.csv', {
+                            'batch_id': data_id,
+                            'label/tensor': "gradient",
+                            'size': len(message)
+                        })
 
         print(f"Gradients {data_id} đã được gửi tới {queue_name}, Kích thước: {len(message)} bytes")
         return True

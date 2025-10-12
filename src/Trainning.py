@@ -36,6 +36,7 @@ class Trainning:
         TrainerClass = TRAINER.get(task)
         args = dict(model=model_path,
                     data=dataset_path,
+                    pretrained="./yolo11n.pt",
                     epochs=epochs,
                     batch=batch_size,
                     project = './runs/detect',
