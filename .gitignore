@@ -178,3 +178,5 @@ test_training.py
 *.xlsx
 *.jpg
 *.json
+/train 13 - 10
+/train 16 -10

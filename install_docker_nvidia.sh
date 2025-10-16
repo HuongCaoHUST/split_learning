@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set +e
 
 docker --version
 sudo apt-get update
