@@ -70,6 +70,7 @@ class Server:
 
         # Clients
         self.total_clients = config["server"]["clients"]
+        self.num_round = config["server"]["num-round"]
         self.batch_size = config["learning"]["batch-size"]
         self.lr = config["learning"]["learning-rate"]
         self.momentum = config["learning"]["momentum"]
@@ -249,6 +250,7 @@ class Server:
                 response = {"action": "START",
                             "message": "Server accept the connection!",
                             "num_client": self.total_clients,
+                            "num_round": self.num_round,
                             "task": self.task,
                             "epochs": self.epochs,
                             "batch_size": self.batch_size,
