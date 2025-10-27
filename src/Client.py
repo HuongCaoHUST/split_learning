@@ -80,7 +80,6 @@ class Client:
                 
                 src.Log.print_with_color("[>>>] Client sent parameters to server", "red")
                 self.send_to_server(data)
-                time.sleep(20)
             return True
         elif action == "STOP":
             print("Training completed. Client stopping.")
