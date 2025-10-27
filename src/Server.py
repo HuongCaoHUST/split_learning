@@ -166,6 +166,7 @@ class Server:
         action = message["action"]
         client_id = message["client_id"]
         layer_id = message["layer_id"]
+        round = 0
 
         if (str(client_id), layer_id) not in self.list_clients:
             self.list_clients.append((str(client_id), layer_id))
@@ -180,11 +181,9 @@ class Server:
 
         elif action == "NOTIFY":
             src.Log.print_with_color(f"[<<<] Received message from client: {message}", "blue")
-            # for (client_id, layer_id) in self.list_clients:
             message = {"action": "PAUSE",
                         "message": "Pause training and please send your parameters",
                         "parameters": None}
-            # self.send_to_client(client_id, pickle.dumps(message))
             src.Log.print_with_color(f"[>>>] Sent stop training request to client {client_id}", "red")
             response = {"action": "STOP",
                         "message": "Stop training!",
@@ -226,12 +225,12 @@ class Server:
 
                 self.val_function.validate_epoch_model()
                 src.Utils.calculate_latency()
-                sys.exit()
+                # sys.exit()
 
         # Ack the message
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
-    def notify_to_clients(self, start=True, register=True):
+    def notify_to_clients(self, status="start", register=True):
 
         src.Log.print_with_color(f"notify_client", "red")
         print("self.list_client: ", self.list_clients)
@@ -241,12 +240,10 @@ class Server:
         self.layer1_clients_id = [client_id for client_id, layer_id in self.list_clients if layer_id == 1]
         print("layer1_1_client: ", self.layer1_clients_id)
 
-        # self.data_distribution = dict(zip(self.layer1_clients_id, self.nb_client))
-        # print("data_distribution: ", self.data_distribution)
 
         dataset_index = 0
         for (client_id, layer_id) in self.list_clients:
-            if start:
+            if status == "start":
                 response = {"action": "START",
                             "message": "Server accept the connection!",
                             "num_client": self.total_clients,
@@ -273,10 +270,15 @@ class Server:
                     response["model_path"] = self.model_path[0]
                     response["cut_layer"] = self.cut_layer[0]
                     response["dataset_path"] = self.dataset_path[0]
-
-            self.time_start = time.time_ns()
-            src.Log.print_with_color(f"[>>>] Sent start training request to client {client_id}", "red")
-            self.send_to_client(client_id, pickle.dumps(response))
+                self.time_start = time.time_ns()
+                src.Log.print_with_color(f"[>>>] Sent start training request to client {client_id}", "red")
+                self.send_to_client(client_id, pickle.dumps(response))
+            
+            if status == "continue":
+                response = {"action": "CONTINUE"}
+                if layer_id == 1:
+                    src.Log.print_with_color(f"[>>>] Sent CONTINUE training request to client {client_id}", "red")
+                    self.send_to_client(client_id, pickle.dumps(response))
 
     def send_to_client(self, client_id, message):
         reply_channel = self.connection.channel()

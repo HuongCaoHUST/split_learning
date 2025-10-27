@@ -55,5 +55,5 @@ def log_gpu_processes():
 if __name__ == "__main__":
     while True:
         log_docker_stats()
-        log_gpu_processes()
+        # log_gpu_processes()
         time.sleep(0.5)

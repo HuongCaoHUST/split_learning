@@ -1,8 +1,8 @@
 name: Split Learning
 server:
-  num-round: 3
+  num-round: 1
   clients:
-    - 2
+    - 1
     - 1
 
 rabbit:
@@ -19,8 +19,8 @@ model:
     - ./yolo11n_custom.yaml
     - ./yolo11n_custom.yaml
   cut_layer: 
-    - 10
-    - 10
+    - 5
+    - 5
   hybrid_training: False
   valid_epoch_model: False
   output_model: ./merged_model.pt

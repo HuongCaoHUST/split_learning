@@ -325,8 +325,8 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                     success = self.send_number_batch_client_id(nb, self.client_id, self.cut_layer, self.tensor_send_ids)
                     if not success:
                         print(f"Không thể gửi number_batch tới queue.")
-                if self.model.is_training == True:
-                    self.start_thread()
+                # if self.model.is_training == True:
+                #     self.start_thread()
                 #Training loop   
                 for i, batch in pbar:
                     self.run_callbacks("on_train_batch_start")
@@ -365,6 +365,33 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                             'batch_id': data_id,
                             'start': start_batch_time,
                         })
+
+                    success_grad, gradient_dict = self.wait_gradient()
+
+                    if not success_grad:
+                        print("Không thấy Gradient.")
+                        return
+                    
+                    tensor_list = [self.model.data_store[t_id] for t_id in gradient_dict.keys()]
+                    grad_list = [gradient_dict[t_id] for t_id in gradient_dict.keys()]
+
+                    torch.autograd.backward(tensor_list, grad_list)
+                    self.count_batch += 1
+
+                    # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
+                    if ni - last_opt_step >= self.accumulate:
+                        self.optimizer_step()
+                        last_opt_step = ni
+
+                    # Timed stopping
+                    if self.args.time:
+                        self.stop = (time.time() - self.train_time_start) > (self.args.time * 3600)
+                        if RANK != -1:  # if DDP training
+                            broadcast_list = [self.stop if RANK == 0 else None]
+                            dist.broadcast_object_list(broadcast_list, 0)  # broadcast 'stop' to all ranks
+                            self.stop = broadcast_list[0]
+                        if self.stop:  # training time exceeded
+                            break
 
                     # Log
                     if RANK in {-1, 0}:
@@ -572,7 +599,7 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
             # Do final val with best.pt
             seconds = time.time() - self.train_time_start
             LOGGER.info(f"\n{epoch - self.start_epoch + 1} epochs completed in {seconds / 3600:.3f} hours.")
-            self.final_eval()
+            # self.final_eval()
             if self.args.plots and self.layer_id != 1:
                 self.plot_metrics()
             self.run_callbacks("on_train_end")
@@ -810,11 +837,51 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
     def wait_all_backward(self, expected_num):
         with self.condition:
             while self.count_batch < expected_num:
-                # print(f"Waiting... Current: {self.count_batch}/{expected_num}")
+                print(f"Waiting... Current: {self.count_batch}/{expected_num}")
                 self.condition.wait(timeout=0.5)
 
             print("Enough gradients received. Continue training.")
             self.count_batch = 0
+
+    def wait_gradient(self):
+        """
+        Wait for gradient data from the gradient_queue.
+
+        Returns:
+            tuple: (success_flag, grad4, grad6, grad10)
+        """
+        tensor_send_ids = self.get_tensor_send_id(self.cut_layer)
+        while True:
+            queue_name = f'gradient_queue_{self.client_id}'
+            method_frame, header_frame, body = self.channel.basic_get(queue=queue_name, auto_ack=True)
+            if method_frame and body:
+                try:
+                    received_data = pickle.loads(body)
+                    data_id = received_data.get('data_id')
+                    gradient_store = received_data.get('gadients', {})  # 'gadients' typo bạn có thể sửa lại thành 'gradients' nếu cần
+
+                    if not isinstance(gradient_store, dict):
+                        raise ValueError("Received 'gadients' is not a valid dictionary")
+
+                    gradient_dict = {}
+
+                    for tensor_id in tensor_send_ids:
+                        grad = gradient_store.get(tensor_id)
+                        if grad is None:
+                            raise ValueError(f"Missing gradient for tensor_id {tensor_id}")
+                        if not isinstance(grad, torch.Tensor):
+                            raise ValueError(f"Gradient for tensor_id {tensor_id} is not a valid tensor")
+                        print(f"Received gradient for tensor_id {tensor_id}, shape: {grad.shape}")
+                        gradient_dict[tensor_id] = grad
+
+                    return True, gradient_dict
+
+                except (pickle.UnpicklingError, ValueError) as e:
+                    print(f"Error processing gradient queue data: {e}")
+                    time.sleep(1)
+            else:
+                # print("No gradient data received yet, waiting...")
+                time.sleep(1)
 
 
     def get_tensor_send_id (self, cut_layer):
