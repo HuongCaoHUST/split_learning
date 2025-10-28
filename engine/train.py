@@ -72,6 +72,8 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
         if self.layer_id == 1:
             self.condition = threading.Condition()
             self.channel_thread = Utils.connect_rabbitmq(self.address, self.username, self.password)
+            self.backward_flag = False
+            self.num_forward = 0
     
 
         self.validate_intermediate = True
@@ -368,6 +370,58 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                             'batch_id': data_id,
                             'start': start_batch_time,
                         })
+                    self.num_forward += 1
+                    print ("BACKWARD FLAG: ", self.backward_flag)
+                    print(f"FORWARD count: {self.num_forward}/{nb}")
+                    print(f"BACKWARD count: {self.count_batch}/{nb}")
+                    if self.backward_flag and self.num_forward < nb:
+                        success_grad, gradient_dict = self.wait_gradient()
+                        if not success_grad:
+                            print("Không thấy Gradient.")
+                            return
+                        
+                        tensor_list = [self.model.data_store[t_id] for t_id in gradient_dict.keys()]
+                        grad_list = [gradient_dict[t_id] for t_id in gradient_dict.keys()]
+
+                        torch.autograd.backward(tensor_list, grad_list)
+                        self.count_batch += 1
+
+                        # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
+                        if ni - last_opt_step >= self.accumulate:
+                            self.optimizer_step()
+                            last_opt_step = ni
+                    elif self.backward_flag or self.num_forward == nb:
+                        print("FINAL BATCH")
+                        if self.count_batch >= nb:
+                            self.count_batch = nb - 1
+                        while self.count_batch < nb:
+                            success_grad, gradient_dict = self.wait_gradient()
+                            if not success_grad:
+                                print("Không thấy Gradient.")
+                                return
+                            
+                            tensor_list = [self.model.data_store[t_id] for t_id in gradient_dict.keys()]
+                            grad_list = [gradient_dict[t_id] for t_id in gradient_dict.keys()]
+
+                            torch.autograd.backward(tensor_list, grad_list)
+                            self.count_batch += 1
+                            print(f"BACKWARD count: {self.count_batch}/{nb}")
+
+                            # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
+                            if ni - last_opt_step >= self.accumulate:
+                                self.optimizer_step()
+                                last_opt_step = ni
+
+                    # Timed stopping
+                    if self.args.time:
+                        self.stop = (time.time() - self.train_time_start) > (self.args.time * 3600)
+                        if RANK != -1:  # if DDP training
+                            broadcast_list = [self.stop if RANK == 0 else None]
+                            dist.broadcast_object_list(broadcast_list, 0)  # broadcast 'stop' to all ranks
+                            self.stop = broadcast_list[0]
+                        if self.stop:  # training time exceeded
+                            break
+
 
                     # success_grad, gradient_dict = self.wait_gradient()
 
@@ -408,6 +462,7 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
 
                 self.lr = {f"lr/pg{ir}": x["lr"] for ir, x in enumerate(self.optimizer.param_groups)}  # for loggers
                 self.run_callbacks("on_train_epoch_end")
+                self.num_forward = 0
                 if RANK in {-1, 0}:
                     final_epoch = epoch + 1 >= self.epochs
                     self.ema.update_attr(self.model, include=["yaml", "nc", "args", "names", "stride", "class_weights"])
@@ -841,9 +896,9 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
 
                 if message_count > 0:
                     print(f"[{queue_name}] Có {message_count} bản tin trong queue.")
-                    self.backward_function()
+                    self.backward_flag = True
                 else:
-                    print(f"[{queue_name}] Queue trống.")
+                    self.backward_flag = False
 
                 time.sleep(1)
         except pika.exceptions.ChannelClosedByBroker:
@@ -939,7 +994,7 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                 try:
                     received_data = pickle.loads(body)
                     data_id = received_data.get('data_id')
-                    gradient_store = received_data.get('gadients', {})  # 'gadients' typo bạn có thể sửa lại thành 'gradients' nếu cần
+                    gradient_store = received_data.get('gadients', {})
 
                     if not isinstance(gradient_store, dict):
                         raise ValueError("Received 'gadients' is not a valid dictionary")
