@@ -386,10 +386,12 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                         torch.autograd.backward(tensor_list, grad_list)
                         self.count_batch += 1
 
-                        # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
-                        if ni - last_opt_step >= self.accumulate:
-                            self.optimizer_step()
-                            last_opt_step = ni
+                        for g in self.optimizer.param_groups:
+                            for p in g['params']:
+                                if p.grad is not None:
+                                    p.grad.data = p.grad.data.float()  # đảm bảo FP32
+                        self.optimizer.step()
+                        self.optimizer.zero_grad()
                     elif self.backward_flag or self.num_forward == nb:
                         print("FINAL BATCH")
                         if self.count_batch >= nb:
@@ -407,10 +409,12 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                             self.count_batch += 1
                             print(f"BACKWARD count: {self.count_batch}/{nb}")
 
-                            # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
-                            if ni - last_opt_step >= self.accumulate:
-                                self.optimizer_step()
-                                last_opt_step = ni
+                            for g in self.optimizer.param_groups:
+                                for p in g['params']:
+                                    if p.grad is not None:
+                                        p.grad.data = p.grad.data.float()  # đảm bảo FP32
+                            self.optimizer.step()
+                            self.optimizer.zero_grad()
 
                     # Timed stopping
                     if self.args.time:
