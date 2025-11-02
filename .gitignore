@@ -180,3 +180,4 @@ test_training.py
 *.json
 /train 13 - 10
 /train 16 -10
+/train_results

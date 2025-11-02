@@ -379,7 +379,7 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                         if not success_grad:
                             print("Không thấy Gradient.")
                             return
-                        
+                        device = next(self.model.parameters()).device
                         tensor_list = [self.model.data_store[t_id] for t_id in gradient_dict.keys()]
                         grad_list = [gradient_dict[t_id] for t_id in gradient_dict.keys()]
 
@@ -562,8 +562,9 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                             gradient_store = {}
                             for tensor_id, tensor in self.model.saved_tensor.items():
                                 if tensor.grad is not None:
-                                    print(f"Gradient shape của tensor {tensor_id}: {tensor.grad.shape}")
-                                    gradient_store[tensor_id] = tensor.grad
+                                    grad_cpu = tensor.grad.detach().cpu()
+                                    print(f"Gradient shape của tensor {tensor_id}: {grad_cpu.shape}")
+                                    gradient_store[tensor_id] = grad_cpu
                                 else:
                                     print(f"Gradient của tensor {tensor_id} là None")
                             
@@ -814,6 +815,8 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                             raise ValueError(f"Missing gradient for tensor_id {tensor_id}")
                         if not isinstance(grad, torch.Tensor):
                             raise ValueError(f"Gradient for tensor_id {tensor_id} is not a valid tensor")
+
+                        # grad = grad.detach().to("cpu")
                         print(f"Received gradient for tensor_id {tensor_id}, shape: {grad.shape}")
                         gradient_dict[tensor_id] = grad
 
