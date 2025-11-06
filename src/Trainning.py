@@ -39,7 +39,7 @@ class Trainning:
                     pretrained="./yolo11n.pt",
                     epochs=epochs,
                     batch=batch_size,
-                    project = './runs/detect',
+                    project = f'./runs/detect/{self.client_id}',
                     workers = worker,
                     save_period = valid_epoch_model)
         trainer = TrainerClass(overrides=args, client_id=self.client_id,
