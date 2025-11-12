@@ -330,8 +330,8 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                     success = self.send_number_batch_client_id(nb, self.client_id, self.cut_layer, self.tensor_send_ids)
                     if not success:
                         print(f"Không thể gửi number_batch tới queue.")
-                if self.model.is_training == True:
-                    self.start_thread()
+                # if self.model.is_training == True:
+                #     self.start_thread()
                 #Training loop   
                 for i, batch in pbar:
                     self.run_callbacks("on_train_batch_start")
@@ -370,68 +370,68 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                             'batch_id': data_id,
                             'start': start_batch_time,
                         })
-                    self.num_forward += 1
-                    print ("BACKWARD FLAG: ", self.backward_flag)
-                    print(f"FORWARD count: {self.num_forward}/{nb}")
-                    print(f"BACKWARD count: {self.count_batch}/{nb}")
-                    if self.backward_flag and self.num_forward < nb:
-                        success_grad, gradient_dict, data_id = self.wait_gradient()
-                        print("[CHECK] Data_id backward: ", data_id)
-                        if not success_grad:
-                            print("Không thấy Gradient.")
-                            return
-                        device = next(self.model.parameters()).device
-                        tensor_list = [self.model.data_store[t_id] for t_id in gradient_dict.keys()]
-                        grad_list = [gradient_dict[t_id] for t_id in gradient_dict.keys()]
+                    # self.num_forward += 1
+                    # print ("BACKWARD FLAG: ", self.backward_flag)
+                    # print(f"FORWARD count: {self.num_forward}/{nb}")
+                    # print(f"BACKWARD count: {self.count_batch}/{nb}")
+                    # if self.backward_flag and self.num_forward < nb:
+                    #     success_grad, gradient_dict, data_id = self.wait_gradient()
+                    #     print("[CHECK] Data_id backward: ", data_id)
+                    #     if not success_grad:
+                    #         print("Không thấy Gradient.")
+                    #         return
+                    #     device = next(self.model.parameters()).device
+                    #     tensor_list = [self.model.data_store[t_id] for t_id in gradient_dict.keys()]
+                    #     grad_list = [gradient_dict[t_id] for t_id in gradient_dict.keys()]
 
-                        torch.autograd.backward(tensor_list, grad_list)
-                        self.count_batch += 1
+                    #     torch.autograd.backward(tensor_list, grad_list)
+                    #     self.count_batch += 1
 
-                        for g in self.optimizer.param_groups:
-                            for p in g['params']:
-                                if p.grad is not None:
-                                    p.grad.data = p.grad.data.float()  # đảm bảo FP32
-                        self.optimizer.step()
-                        self.optimizer.zero_grad()
-                        # Log
-                        end_batch_time = time.time()
-                        Utils.log_to_csv('./log/latency.csv', {
-                            'batch_id': data_id,
-                            'start': "Null",
-                            'end': end_batch_time
-                        })
-                    elif self.backward_flag or self.num_forward == nb:
-                        print("FINAL BATCH")
-                        if self.count_batch >= nb:
-                            self.count_batch = nb - 1
-                        while self.count_batch < nb:
-                            success_grad, gradient_dict, data_id = self.wait_gradient()
-                            print("[CHECK] Data_id backward: ", data_id)
-                            if not success_grad:
-                                print("Không thấy Gradient.")
-                                return
+                    #     for g in self.optimizer.param_groups:
+                    #         for p in g['params']:
+                    #             if p.grad is not None:
+                    #                 p.grad.data = p.grad.data.float()  # đảm bảo FP32
+                    #     self.optimizer.step()
+                    #     self.optimizer.zero_grad()
+                    #     # Log
+                    #     end_batch_time = time.time()
+                    #     Utils.log_to_csv('./log/latency.csv', {
+                    #         'batch_id': data_id,
+                    #         'start': "Null",
+                    #         'end': end_batch_time
+                    #     })
+                    # elif self.backward_flag or self.num_forward == nb:
+                    #     print("FINAL BATCH")
+                    #     if self.count_batch >= nb:
+                    #         self.count_batch = nb - 1
+                    #     while self.count_batch < nb:
+                    #         success_grad, gradient_dict, data_id = self.wait_gradient()
+                    #         print("[CHECK] Data_id backward: ", data_id)
+                    #         if not success_grad:
+                    #             print("Không thấy Gradient.")
+                    #             return
                             
-                            tensor_list = [self.model.data_store[t_id] for t_id in gradient_dict.keys()]
-                            grad_list = [gradient_dict[t_id] for t_id in gradient_dict.keys()]
+                    #         tensor_list = [self.model.data_store[t_id] for t_id in gradient_dict.keys()]
+                    #         grad_list = [gradient_dict[t_id] for t_id in gradient_dict.keys()]
 
-                            torch.autograd.backward(tensor_list, grad_list)
-                            self.count_batch += 1
-                            print(f"BACKWARD count: {self.count_batch}/{nb}")
+                    #         torch.autograd.backward(tensor_list, grad_list)
+                    #         self.count_batch += 1
+                    #         print(f"BACKWARD count: {self.count_batch}/{nb}")
 
-                            for g in self.optimizer.param_groups:
-                                for p in g['params']:
-                                    if p.grad is not None:
-                                        p.grad.data = p.grad.data.float()  # đảm bảo FP32
-                            self.optimizer.step()
-                            self.optimizer.zero_grad()
+                    #         for g in self.optimizer.param_groups:
+                    #             for p in g['params']:
+                    #                 if p.grad is not None:
+                    #                     p.grad.data = p.grad.data.float()  # đảm bảo FP32
+                    #         self.optimizer.step()
+                    #         self.optimizer.zero_grad()
                             
-                            # Log
-                            end_batch_time = time.time()
-                            Utils.log_to_csv('./log/latency.csv', {
-                                'batch_id': data_id,
-                                'start': "Null",
-                                'end': end_batch_time
-                            })
+                    #         # Log
+                    #         end_batch_time = time.time()
+                    #         Utils.log_to_csv('./log/latency.csv', {
+                    #             'batch_id': data_id,
+                    #             'start': "Null",
+                    #             'end': end_batch_time
+                    #         })
 
                     # Timed stopping
                     if self.args.time:
