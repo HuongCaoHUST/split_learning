@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-docker compose up -d
+docker compose -f docker-compose.yaml -f docker-compose.gpu.yaml up -d
 
 python3 log_view.py &
 LOG_PID=$!
