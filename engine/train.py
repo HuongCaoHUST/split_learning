@@ -53,7 +53,7 @@ from ultralytics.utils.torch_utils import (
 import threading
 
 class Split_Learning_DetectionTrainer(DetectionTrainer):
-    def __init__(self, overrides, client_id=None, layer_id=None, num_client=None, cut_layer=None, address=None, username=None, password=None, load_partial_model=False):
+    def __init__(self, overrides, client_id=None, layer_id=None, num_client=None, cut_layer=None, address=None, username=None, password=None, load_partial_model=False, FedAvg=False):
         self.client_id = client_id
         self.layer_id = layer_id
         self.num_client = num_client
@@ -74,10 +74,11 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
             self.channel_thread = Utils.connect_rabbitmq(self.address, self.username, self.password)
             self.backward_flag = False
             self.num_forward = 0
-    
 
         self.validate_intermediate = True
         super().__init__(overrides=overrides)
+        if FedAvg:
+            self.epochs = overrides.get("epochs", 100)
     
     def get_dataloader(self, dataset_path: str, batch_size: int = 16, rank: int = 0, mode: str = "train"):
         """
@@ -744,7 +745,7 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                     received += 1
             else:
                 time.sleep(0.5)
-        self.channel.queue_delete(queue=queue_name)
+        # self.channel.queue_delete(queue=queue_name)
         return total_nb
     
     def wait_for_batch(self):
@@ -1214,6 +1215,42 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                         self.metrics = self.validator(model=f)
                     self.metrics.pop("fitness", None)
                     self.run_callbacks("on_fit_epoch_end")
+
+    def resume_training(self, ckpt):
+        """Resume YOLO training from given epoch and best fitness."""
+        # print("[CHECK] Resuming training...")
+        if ckpt is None or not self.resume:
+            return
+        best_fitness = 0.0
+        start_epoch = ckpt.get("epoch", -1) + 1
+        if ckpt.get("optimizer", None) is not None:
+            self.optimizer.load_state_dict(ckpt["optimizer"])  # optimizer
+            best_fitness = ckpt["best_fitness"]
+        if self.ema and ckpt.get("ema"):
+            self.ema.ema.load_state_dict(ckpt["ema"].float().state_dict())  # EMA
+            self.ema.updates = ckpt["updates"]
+        assert start_epoch > 0, (
+            f"{self.args.model} training to {self.epochs} epochs is finished, nothing to resume.\n"
+            f"Start a new training without resuming, i.e. 'yolo train model={self.args.model}'"
+        )
+        LOGGER.info(f"Resuming training {self.args.model} from epoch {start_epoch + 1} to {self.epochs} total epochs")
+
+        if self.layer_id == 1:
+            nb = len(self.train_loader)
+            print("[CHECK]Number of batches:", nb)
+            success = self.send_number_batch_client_id(nb, self.client_id, self.cut_layer, self.tensor_send_ids)
+            if not success:
+                print(f"Không thể gửi number_batch tới queue.")
+
+        if self.epochs < start_epoch:
+            LOGGER.info(
+                f"{self.model} has been trained for {ckpt['epoch']} epochs. Fine-tuning for {self.epochs} more epochs."
+            )
+            self.epochs += ckpt["epoch"]  # finetune additional epochs
+        self.best_fitness = best_fitness
+        self.start_epoch = start_epoch
+        if start_epoch > (self.epochs - self.args.close_mosaic):
+            self._close_dataloader_mosaic()
 
 class Split_Learning_SegmentationTrainer(Split_Learning_DetectionTrainer):
     def __init__(self, overrides, client_id=None, layer_id=None, num_client=None, cut_layer=None, address=None, 

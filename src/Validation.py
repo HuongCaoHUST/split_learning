@@ -2,6 +2,7 @@ from ultralytics.models.yolo.detect import DetectionValidator
 from ultralytics.models.yolo.segment import SegmentationValidator
 from ultralytics.models.yolo.classify import ClassificationValidator
 from ultralytics import YOLO
+import torch
 import src.Utils
 
 class ModelValidator:
@@ -247,7 +248,7 @@ class ModelValidator:
         return output_path
     
 
-    def merge_partial_fedavg(model_paths_layer1, model_path_layer2, cut_layer, output_path):
+    def merge_partial_fedavg(self, model_paths_layer1, model_path_layer2, cut_layer, output_path):
         state_dicts = []
         for path in model_paths_layer1:
             model = YOLO(path)
@@ -268,4 +269,27 @@ class ModelValidator:
         model2.model.load_state_dict(base_state)
         model2.save(output_path)                    
         print(f"✅ Đã ghép model xong, lưu tại: {output_path}")
+        return output_path
+    
+    def average_yolo_models(self, best_model_layer_1, output_path):
+        print("Averaging 2 YOLO models...")
+
+        model1 = YOLO(best_model_layer_1[0])
+        model2 = YOLO(best_model_layer_1[1])
+
+        sd1 = model1.model.state_dict()
+        sd2 = model2.model.state_dict()
+
+        if sd1.keys() != sd2.keys():
+            raise ValueError("Hai model không có cùng kiến trúc. Keys không giống nhau.")
+
+        avg_sd = {}
+        for key in sd1.keys():
+            avg_sd[key] = (sd1[key] + sd2[key]) / 2.0
+
+        model_new = YOLO(best_model_layer_1[0])
+        model_new.model.load_state_dict(avg_sd)
+
+        model_new.save(output_path)
+        print(f"✔ Đã ghép và lưu model tại: {output_path}")
         return output_path

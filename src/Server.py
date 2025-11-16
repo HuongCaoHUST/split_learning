@@ -79,6 +79,9 @@ class Server:
 
         self.register_clients = [0 for _ in range(len(self.total_clients))]
         self.list_clients = []
+        self.count = [0, 0]
+        self.last_model_layer_1 = []
+        self.last_model_layer_2 = []
 
         # Model
         self.task = config["model"]["task"]
@@ -166,7 +169,6 @@ class Server:
         action = message["action"]
         client_id = message["client_id"]
         layer_id = message["layer_id"]
-        round = 0
 
         if (str(client_id), layer_id) not in self.list_clients:
             self.list_clients.append((str(client_id), layer_id))
@@ -180,15 +182,44 @@ class Server:
                 self.notify_to_clients()
 
         elif action == "NOTIFY":
-            src.Log.print_with_color(f"[<<<] Received message from client: {message}", "blue")
-            message = {"action": "PAUSE",
+            # src.Log.print_with_color(f"[<<<] Received message from client: {message}", "blue")
+            # message = {"action": "PAUSE",
+            #             "message": "Pause training and please send your parameters",
+            #             "parameters": None}
+            # src.Log.print_with_color(f"[>>>] Sent stop training request to client {client_id}", "red")
+            # response = {"action": "STOP",
+            #             "message": "Stop training!",
+            #             "parameters": None}
+            # self.send_to_client(client_id, pickle.dumps(response))
+            src.Log.print_with_color(f"[<<<] Received message from client 1: {message}", "blue")
+            if layer_id == 1:
+                print("BEST MODEL FROM CLIENT:", message["best"])
+                print("LAST MODEL FROM CLIENT:", message["last"])
+                self.last_model_layer_1.append(message["last"])
+                self.count[0] += 1
+            elif layer_id == 2:
+                print("BEST MODEL FROM CLIENT:", message["best"])
+                print("LAST MODEL FROM CLIENT:", message["last"])
+                print("[CHECK] ROUND: ", message.get("round"))
+                self.last_model_layer_2.append(message["last"])
+                self.count[1] += 1
+                print("COUNT:", self.count)
+                print("Received all parameter clients")
+                print("LAST MODEL LAYER 1:", self.last_model_layer_1)
+                print("LAST MODEL LAYER 2:", self.last_model_layer_2)
+                if message.get("round") < self.num_round:
+                    avg_model_path =self.val_function.average_yolo_models(self.last_model_layer_1, "./fedavg_model_layer_1.pt")
+                    message = {"action": "CONTINUE",
+                        "message": "Continue training!",
+                        "model_path": avg_model_path}
+                    self.notify_to_all_clients(message)
+                else:
+                    message = {"action": "PAUSE",
                         "message": "Pause training and please send your parameters",
                         "parameters": None}
-            src.Log.print_with_color(f"[>>>] Sent stop training request to client {client_id}", "red")
-            response = {"action": "STOP",
-                        "message": "Stop training!",
-                        "parameters": None}
-            self.send_to_client(client_id, pickle.dumps(response))
+                    src.Log.print_with_color(f"[>>>] Sent stop training request to client {client_id}", "red")
+                    self.notify_to_all_clients(message)
+
 
         elif action == "VAL_INTER":
             src.Log.print_with_color(f"[<<<] Received message from client: {message}", "blue")
@@ -225,7 +256,7 @@ class Server:
 
                 self.val_function.validate_epoch_model()
                 src.Utils.calculate_latency()
-                # sys.exit()
+                sys.exit()
 
         # Ack the message
         ch.basic_ack(delivery_tag=method.delivery_tag)
@@ -235,11 +266,7 @@ class Server:
         src.Log.print_with_color(f"notify_client", "red")
         print("self.list_client: ", self.list_clients)
         self.layer1_clients = [(client_id, layer_id) for client_id, layer_id in self.list_clients if layer_id == 1]
-        print("layer1_client: ", self.layer1_clients)
-
         self.layer1_clients_id = [client_id for client_id, layer_id in self.list_clients if layer_id == 1]
-        print("layer1_1_client: ", self.layer1_clients_id)
-
 
         dataset_index = 0
         for (client_id, layer_id) in self.list_clients:
@@ -291,6 +318,11 @@ class Server:
             routing_key=reply_queue_name,
             body=message
         )
+
+    def notify_to_all_clients(self, message):
+        for (client_id, layer_id) in self.list_clients:
+            src.Log.print_with_color(f"[>>>] Sent resume training request to client {client_id}", "red")
+            self.send_to_client(client_id, pickle.dumps(message))
 
     def random_dataset(self, num_clients):
         dataset_path = "./datasets/mnist_yolo_cls_dirichlet"

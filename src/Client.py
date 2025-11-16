@@ -62,24 +62,22 @@ class Client:
 
         if action == "START":
             src.Log.print_with_color(f"[<<<] Client received: {self.response}", "blue")
-            for round in range(num_round):
-                src.Log.print_with_color(f"--- START ROUND {round + 1} / {num_round} ---", "green")
-                if self.layer_id == 1:
-                    result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, task, epochs, batch_size, worker, self.address, self.username, self.password, load_partial_model, valid_epoch_model)
-                if self.layer_id == 2:
-                    result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, task, epochs, batch_size, worker, self.address, self.username, self.password, load_partial_model, valid_epoch_model)
-                
-                if self.virtual_machine:
-                    file_data = src.Utils.read_file(best)
-                    data = {"action": "UPDATE", "client_id": self.client_id, "layer_id": self.layer_id,
-                            "result": result, "message": "Sent parameters to Server", "vm": self.virtual_machine, "best": file_data}
-                else:
-                    best = str(best).replace("F:\\Do_an\\split_learning", "/app").replace("\\", "/")
-                    data = {"action": "UPDATE", "client_id": self.client_id, "layer_id": self.layer_id,
-                            "result": result, "message": "Sent parameters to Server", "vm": self.virtual_machine, "best": best}
-                
-                src.Log.print_with_color("[>>>] Client sent parameters to server", "red")
-                self.send_to_server(data)
+            if self.layer_id == 1:
+                result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, num_round, task, epochs, batch_size, worker, self.address, self.username, self.password, load_partial_model, valid_epoch_model)
+            if self.layer_id == 2:
+                result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, num_round, task, epochs, batch_size, worker, self.address, self.username, self.password, load_partial_model, valid_epoch_model)
+            
+            if self.virtual_machine:
+                file_data = src.Utils.read_file(best)
+                data = {"action": "UPDATE", "client_id": self.client_id, "layer_id": self.layer_id,
+                        "result": result, "message": "Sent parameters to Server", "vm": self.virtual_machine, "best": file_data}
+            else:
+                best = str(best).replace("F:\\Do_an\\split_learning", "/app").replace("\\", "/")
+                data = {"action": "UPDATE", "client_id": self.client_id, "layer_id": self.layer_id,
+                        "result": result, "message": "Sent parameters to Server", "vm": self.virtual_machine, "best": best}
+            
+            src.Log.print_with_color("[>>>] Client sent parameters to server", "red")
+            self.send_to_server(data)
             return True
         elif action == "STOP":
             print("Training completed. Client stopping.")

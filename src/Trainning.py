@@ -17,6 +17,7 @@ class Trainning:
         self.event_time = event_time
         self.time_event = []
         self.best_model = None
+        self.current_round = 1
     
 
     def send_to_server(self, message):
@@ -25,8 +26,8 @@ class Trainning:
                                    routing_key='Server_queue',
                                    body=pickle.dumps(message))
 
-    def train_on_first_layer(self, model_path, dataset_path, num_client, cut_layer, task, epochs, batch_size, worker, address = None, username = None, password = None, load_partial_model=False, valid_epoch_model = -1):
-        src.Log.print_with_color("--- START TRAINING FIRST LAYER ---", "green")
+    def train_on_first_layer(self, model_path, dataset_path, num_client, cut_layer, num_round, task, epochs, batch_size, worker, address = None, username = None, password = None, load_partial_model=False, valid_epoch_model = -1):
+        src.Log.print_with_color(f"--- START TRAINING FIRST LAYER --- CURREN ROUND: {self.current_round} ---", "green")
 
         TRAINER = {
             "detect": Split_Learning_DetectionTrainer,
@@ -46,12 +47,20 @@ class Trainning:
                                          layer_id=self.layer_id, num_client=num_client,
                                          cut_layer=cut_layer, address=address, username=username, password=password, load_partial_model=load_partial_model)
         trainer.train()
-        self.best_model = trainer.best
+        self.best_model = str(trainer.best)
+        if not self.best_model.startswith("./"):
+            self.best_model = "./" + self.best_model
+
+        self.last_model = str(trainer.last)
+        if not self.last_model.startswith("./"):
+            self.last_model = "./" + self.last_model
+
         notify_data = {"action": "NOTIFY", "client_id": self.client_id, "layer_id": self.layer_id,
-                           "message": "Finish training!", "validate": None}
+                           "message": "Finish round 1!", "round": self.current_round, "best": self.best_model, "last": self.last_model}
         # Finish epoch training, send notify to server
         self.send_to_server(notify_data)
-        src.Log.print_with_color("[>>>] Finish training!", "red")
+        self.current_round += 1
+        # src.Log.print_with_color("[>>>] Finish training!", "red")
 
         broadcast_queue_name = f'reply_{self.client_id}'
         while True:  # Wait for broadcast
@@ -61,10 +70,34 @@ class Trainning:
                 src.Log.print_with_color(f"[<<<] Received message from server {received_data}", "blue")
                 if received_data["action"] == "PAUSE":
                     return True
-                break
+                elif received_data["action"] == "CONTINUE":
+                    print("Continue training next round")
+                    print("Fed avg model path:", received_data["model_path"])
+                    args = dict(resume=received_data["model_path"],
+                                data=dataset_path,
+                                epochs=self.current_round*epochs,
+                                batch=batch_size,
+                                project = f'./runs/detect/{self.client_id}',
+                                workers = worker,
+                                save_period = valid_epoch_model)
+                    trainer = TrainerClass(overrides=args, client_id=self.client_id, layer_id=self.layer_id, num_client=num_client,
+                            cut_layer=cut_layer, address=address, username=username, password=password, load_partial_model=load_partial_model, FedAvg=True)
+                    trainer.train()
+                    self.current_round += 1
+                    self.best_model = str(trainer.best)
+                    if not self.best_model.startswith("./"):
+                        self.best_model = "./" + self.best_model
+
+                    self.last_model = str(trainer.last)
+                    if not self.last_model.startswith("./"):
+                        self.last_model = "./" + self.last_model
+
+                    notify_data = {"action": "NOTIFY", "client_id": self.client_id, "layer_id": self.layer_id,
+                                    "message": "Finish round 2!", "round": self.current_round, "best": self.best_model, "last": self.last_model}
+                    self.send_to_server(notify_data)
             time.sleep(0.5)
 
-    def train_on_last_layer(self, model_path, dataset_path, num_client, cut_layer, task, epochs, batch_size, worker, address = None, username = None, password = None, load_partial_model=False, valid_epoch_model = -1):
+    def train_on_last_layer(self, model_path, dataset_path, num_client, cut_layer, num_round, task, epochs, batch_size, worker, address = None, username = None, password = None, load_partial_model=False, valid_epoch_model = -1):
         queue_name = f'label_queue'
         result = True
         self.channel.queue_declare(queue=queue_name, durable=False)
@@ -93,12 +126,20 @@ class Trainning:
                                          layer_id=self.layer_id, num_client=num_client,
                                          cut_layer=cut_layer, address=address, username=username, password=password, load_partial_model=load_partial_model)
         trainer.train()
-        self.best_model = trainer.best
+        self.best_model = str(trainer.best)
+        if not self.best_model.startswith("./"):
+            self.best_model = "./" + self.best_model
+
+        self.last_model = str(trainer.last)
+        if not self.last_model.startswith("./"):
+            self.last_model = "./" + self.last_model
         notify_data = {"action": "NOTIFY", "client_id": self.client_id, "layer_id": self.layer_id,
-                           "message": "Finish training!", "validate": None}
+                           "message": "Finished round 1!", "round": self.current_round, "best": self.best_model, "last": self.last_model}
+        
         # Finish epoch training, send notify to server
         self.send_to_server(notify_data)
-        src.Log.print_with_color("[>>>] Finish training!", "red")
+        src.Log.print_with_color("[>>>] Finish round 1!", "red")
+        self.current_round += 1
 
         # Check training process
         broadcast_queue_name = f'reply_{self.client_id}'
@@ -109,10 +150,34 @@ class Trainning:
                 src.Log.print_with_color(f"[<<<] Received message from server {received_data}", "blue")
                 if received_data["action"] == "PAUSE":
                     return True
-                break
+                elif received_data["action"] == "CONTINUE":
+                    print("Continue training next round")
+                    args = dict(resume=self.last_model,
+                                data=dataset_path,
+                                epochs=self.current_round*epochs,
+                                batch=batch_size,
+                                project = f'./runs/detect/{self.client_id}',
+                                workers = worker,
+                                close_mosaic=0,
+                                save_period = valid_epoch_model)
+                    trainer = TrainerClass(overrides=args, client_id=self.client_id, layer_id=self.layer_id, num_client=num_client,
+                            cut_layer=cut_layer, address=address, username=username, password=password, load_partial_model=load_partial_model, FedAvg=True)
+                    trainer.train()
+                    self.current_round += 1
+                    self.best_model = str(trainer.best)
+                    if not self.best_model.startswith("./"):
+                        self.best_model = "./" + self.best_model
+
+                    self.last_model = str(trainer.last)
+                    if not self.last_model.startswith("./"):
+                        self.last_model = "./" + self.last_model
+
+                    notify_data = {"action": "NOTIFY", "client_id": self.client_id, "layer_id": self.layer_id,
+                                    "message": "Finish round 2!", "round": self.current_round, "best": self.best_model, "last": self.last_model}
+                    self.send_to_server(notify_data)
             time.sleep(0.5)
                     
-    def train_on_device(self, model_path, dataset_path, num_client,cut_layer, task, epochs, batch_size, worker, address, username, password, load_partial_model, valid_epoch_model):
+    def train_on_device(self, model_path, dataset_path, num_client,cut_layer, num_round, task, epochs, batch_size, worker, address, username, password, load_partial_model, valid_epoch_model):
         self.data_count = 0
         if self.layer_id == 1:
 
@@ -121,7 +186,7 @@ class Trainning:
             self.channel.queue_declare(queue=forward_queue_name, durable=False)
             self.channel.basic_qos(prefetch_count=10)
 
-            result = self.train_on_first_layer(model_path, dataset_path, num_client,cut_layer, task, epochs, batch_size, worker, address, username, password, load_partial_model, valid_epoch_model)
+            result = self.train_on_first_layer(model_path, dataset_path, num_client,cut_layer, num_round, task, epochs, batch_size, worker, address, username, password, load_partial_model, valid_epoch_model)
 
         elif self.layer_id == 2:
             # Create intermediate queue
@@ -134,7 +199,7 @@ class Trainning:
             self.channel.queue_declare(queue=forward_queue_name, durable=False)
             self.channel.basic_qos(prefetch_count=10)
             
-            result = self.train_on_last_layer(model_path, dataset_path, num_client, cut_layer, task, epochs, batch_size, worker, address, username, password, load_partial_model, valid_epoch_model)
+            result = self.train_on_last_layer(model_path, dataset_path, num_client, cut_layer, num_round, task, epochs, batch_size, worker, address, username, password, load_partial_model, valid_epoch_model)
 
         if self.event_time:
             src.Log.print_with_color(f"Training time events {self.time_event}", "yellow")

@@ -1,6 +1,6 @@
 name: Split Learning
 server:
-  num-round: 1
+  num-round: 2
   clients:
     - 2
     - 1
@@ -27,8 +27,8 @@ model:
 
 dataset:
   dataset_path:
-    - ./datasets/livingroom_4_1.yaml
-    - ./datasets/livingroom_4_2.yaml
+    - ./coco8.yaml
+    - ./coco8.yaml
   concatenate_datasets: False
   iid_datasets: False
 
