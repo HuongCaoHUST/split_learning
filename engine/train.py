@@ -1237,7 +1237,6 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
 
         if self.layer_id == 1:
             nb = len(self.train_loader)
-            print("[CHECK]Number of batches:", nb)
             success = self.send_number_batch_client_id(nb, self.client_id, self.cut_layer, self.tensor_send_ids)
             if not success:
                 print(f"Không thể gửi number_batch tới queue.")
