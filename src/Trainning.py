@@ -4,7 +4,8 @@ import pika
 from tqdm import tqdm
 from engine.train import Split_Learning_DetectionTrainer, Split_Learning_SegmentationTrainer, Split_Learning_ClassificationTrainer
 import src.Log
-
+from ultralytics import YOLO
+import torch
 
 class Trainning:
     def __init__(self, client_id, layer_id, channel, device, event_time=False):
@@ -73,8 +74,35 @@ class Trainning:
                 elif received_data["action"] == "CONTINUE":
                     print("Continue training next round")
                     print("Fed avg model path:", received_data["model_path"])
-                    args = dict(resume=received_data["model_path"],
-                                data=dataset_path,
+                    fed_model_path = received_data["model_path"]
+                    trainer_last = trainer.last  # Đường dẫn local để giữ
+
+                    # 1. Load CHỈ WEIGHTS từ fed model (bỏ qua metadata/config)
+                    fed_ckpt = torch.load(fed_model_path, map_location='cpu')  # Load checkpoint
+                    if isinstance(fed_ckpt, dict) and 'model' in fed_ckpt:
+                        fed_sd = fed_ckpt['model'].state_dict()  # Lấy weights từ 'model' key
+                    else:
+                        fed_sd = fed_ckpt.state_dict() if hasattr(fed_ckpt, 'state_dict') else fed_ckpt
+
+                    # 2. Load LOCAL model từ trainer.last (giữ nguyên project/save_dir local)
+                    last_model = YOLO(trainer_last)
+                    last_sd = last_model.model.state_dict()
+
+                    # 3. Lọc chỉ keys khớp (tên + shape) để tránh lỗi head/projection
+                    filtered_sd = {k: v for k, v in fed_sd.items() if k in last_sd and v.shape == last_sd[k].shape}
+
+                    print(f"Loaded {len(filtered_sd)}/{len(fed_sd)} weights (skipped mismatched keys like head).")
+
+                    # 4. Load weights vào local model
+                    last_model.model.load_state_dict(filtered_sd, strict=False)
+
+                    # 5. Save với đường dẫn local → KHÔNG dính config fed
+                    last_model.save(trainer_last)
+
+                    print(f"Saved to local: {trainer_last}")
+                    print(f"Local save_dir unchanged: {last_model.save_dir if hasattr(last_model, 'save_dir') else 'N/A'}")
+
+                    args = dict(resume=trainer_last,
                                 epochs=self.current_round*epochs,
                                 batch=batch_size,
                                 project = f'./runs/detect/{self.client_id}',
