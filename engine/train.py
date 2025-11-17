@@ -788,44 +788,44 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
         print(f"Gradients {data_id} đã được gửi tới {queue_name}, Kích thước: {len(message)} bytes")
         return True
 
-    def wait_gradient(self):
-        """
-        Wait for gradient data from the gradient_queue.
+    # def wait_gradient(self):
+    #     """
+    #     Wait for gradient data from the gradient_queue.
 
-        Returns:
-            tuple: (success_flag, grad4, grad6, grad10)
-        """
-        while True:
-            queue_name = f'gradient_queue_{self.layer_id}'
-            method_frame, header_frame, body = self.channel.basic_get(queue=queue_name, auto_ack=True)
-            if method_frame and body:
-                try:
-                    received_data = pickle.loads(body)
-                    data_id = received_data.get('data_id')
-                    gradient_store = received_data.get('gadients', {})
+    #     Returns:
+    #         tuple: (success_flag, grad4, grad6, grad10)
+    #     """
+    #     while True:
+    #         queue_name = f'gradient_queue_{self.layer_id}'
+    #         method_frame, header_frame, body = self.channel.basic_get(queue=queue_name, auto_ack=True)
+    #         if method_frame and body:
+    #             try:
+    #                 received_data = pickle.loads(body)
+    #                 data_id = received_data.get('data_id')
+    #                 gradient_store = received_data.get('gadients', {})
 
-                    if not isinstance(gradient_store, dict):
-                        raise ValueError("Received 'gadients' is not a valid dictionary")
+    #                 if not isinstance(gradient_store, dict):
+    #                     raise ValueError("Received 'gadients' is not a valid dictionary")
 
-                    gradient_dict = {}
+    #                 gradient_dict = {}
 
-                    for tensor_id in self.tensor_send_ids:
-                        grad = gradient_store.get(tensor_id)
-                        if grad is None:
-                            raise ValueError(f"Missing gradient for tensor_id {tensor_id}")
-                        if not isinstance(grad, torch.Tensor):
-                            raise ValueError(f"Gradient for tensor_id {tensor_id} is not a valid tensor")
-                        print(f"Received gradient for tensor_id {tensor_id}, shape: {grad.shape}")
-                        gradient_dict[tensor_id] = grad
+    #                 for tensor_id in self.tensor_send_ids:
+    #                     grad = gradient_store.get(tensor_id)
+    #                     if grad is None:
+    #                         raise ValueError(f"Missing gradient for tensor_id {tensor_id}")
+    #                     if not isinstance(grad, torch.Tensor):
+    #                         raise ValueError(f"Gradient for tensor_id {tensor_id} is not a valid tensor")
+    #                     print(f"Received gradient for tensor_id {tensor_id}, shape: {grad.shape}")
+    #                     gradient_dict[tensor_id] = grad
 
-                    return True, gradient_dict
+    #                 return True, gradient_dict
 
-                except (pickle.UnpicklingError, ValueError) as e:
-                    print(f"Error processing gradient queue data: {e}")
-                    time.sleep(0.5)
-            else:
-                # print("No gradient data received yet, waiting...")
-                time.sleep(0.5)
+    #             except (pickle.UnpicklingError, ValueError) as e:
+    #                 print(f"Error processing gradient queue data: {e}")
+    #                 time.sleep(0.5)
+    #         else:
+    #             # print("No gradient data received yet, waiting...")
+    #             time.sleep(0.5)
 
     def check_gradient(self):
         thread_channel = self.channel_thread
