@@ -28,6 +28,7 @@ from engine.data import check_det_dataset
 from copy import deepcopy
 from datetime import datetime
 from src import Utils
+from tqdm import tqdm
 from ultralytics.utils import (
     DEFAULT_CFG,
     LOCAL_RANK,
@@ -372,9 +373,15 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                             'start': start_batch_time,
                         })
                     self.num_forward += 1
-                    print ("BACKWARD FLAG: ", self.backward_flag)
-                    print(f"FORWARD count: {self.num_forward}/{nb}")
-                    print(f"BACKWARD count: {self.count_batch}/{nb}")
+                    # print ("BACKWARD FLAG: ", self.backward_flag)
+                    # print(f"FORWARD count: {self.num_forward}/{nb}")
+                    # print(f"BACKWARD count: {self.count_batch}/{nb}")
+                    pbar.update(1)
+                    pbar.set_postfix({
+                        "FORWARD": self.num_forward,
+                        "BACKWARD": self.count_batch
+                    })
+
                     if self.backward_flag and self.num_forward < nb:
                         success_grad, gradient_dict = self.wait_gradient()
                         if not success_grad:
@@ -394,7 +401,7 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                         self.optimizer.step()
                         self.optimizer.zero_grad()
                     elif self.backward_flag or self.num_forward == nb:
-                        print("FINAL BATCH")
+                        # print("FINAL BATCH")
                         if self.count_batch >= nb:
                             self.count_batch = nb - 1
                         while self.count_batch < nb:
@@ -408,8 +415,13 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
 
                             torch.autograd.backward(tensor_list, grad_list)
                             self.count_batch += 1
-                            print(f"BACKWARD count: {self.count_batch}/{nb}")
+                            # print(f"BACKWARD count: {self.count_batch}/{nb}")
 
+                            pbar.update(1)
+                            pbar.set_postfix({
+                                "FORWARD": self.num_forward,
+                                "BACKWARD": self.count_batch
+                            })
                             for g in self.optimizer.param_groups:
                                 for p in g['params']:
                                     if p.grad is not None:
@@ -563,7 +575,7 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                             gradient_store = {}
                             for tensor_id, tensor in self.model.saved_tensor.items():
                                 if tensor.grad is not None:
-                                    print(f"Gradient shape của tensor {tensor_id}: {tensor.grad.shape}")
+                                    # print(f"Gradient shape của tensor {tensor_id}: {tensor.grad.shape}")
                                     gradient_store[tensor_id] = tensor.grad
                                 else:
                                     print(f"Gradient của tensor {tensor_id} là None")
@@ -701,7 +713,7 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                             'size': len(message)
                         })
 
-        print(f"Batch {data_id} đã được gửi tới {queue_name}, Kích thước: {len(message)} bytes")
+        # print(f"Batch {data_id} đã được gửi tới {queue_name}, Kích thước: {len(message)} bytes")
         return True
     
     def send_number_batch_client_id(self, nb = None, client_id = None, client_cut_layer = None, tensor_send_ids = None):
@@ -756,7 +768,7 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                 received_data = pickle.loads(body)
                 data_id = received_data["data_id"]
                 data = received_data["label"]
-                print(f"Received BATCH with data_id: {data_id}")
+                # print(f"Received BATCH with data_id: {data_id}")
                 return data
             else:
                 # print("No data received yet, waiting...")
@@ -785,7 +797,7 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                             'size': len(message)
                         })
 
-        print(f"Gradients {data_id} đã được gửi tới {queue_name}, Kích thước: {len(message)} bytes")
+        # print(f"Gradients {data_id} đã được gửi tới {queue_name}, Kích thước: {len(message)} bytes")
         return True
 
     # def wait_gradient(self):
@@ -900,7 +912,7 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                 message_count = q.method.message_count
 
                 if message_count > 0:
-                    print(f"[{queue_name}] Có {message_count} bản tin trong queue.")
+                    # print(f"[{queue_name}] Có {message_count} bản tin trong queue.")
                     self.backward_flag = True
                 else:
                     self.backward_flag = False
@@ -981,7 +993,7 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                 # print(f"Waiting... Current: {self.count_batch}/{expected_num}")
                 self.condition.wait(timeout=1)
 
-            print("Enough gradients received. Continue training.")
+            # print("Enough gradients received. Continue training.")
             self.count_batch = 0
 
     def wait_gradient(self):
@@ -1012,7 +1024,7 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                             raise ValueError(f"Missing gradient for tensor_id {tensor_id}")
                         if not isinstance(grad, torch.Tensor):
                             raise ValueError(f"Gradient for tensor_id {tensor_id} is not a valid tensor")
-                        print(f"Received gradient for tensor_id {tensor_id}, shape: {grad.shape}")
+                        # print(f"Received gradient for tensor_id {tensor_id}, shape: {grad.shape}")
                         gradient_dict[tensor_id] = grad
 
                     return True, gradient_dict
@@ -1730,7 +1742,7 @@ class Split_Learning_ClassificationTrainer(ClassificationTrainer):
                             gradient_store = {}
                             for tensor_id, tensor in self.model.saved_tensor.items():
                                 if tensor.grad is not None:
-                                    print(f"Gradient shape của tensor {tensor_id}: {tensor.grad.shape}")
+                                    # print(f"Gradient shape của tensor {tensor_id}: {tensor.grad.shape}")
                                     gradient_store[tensor_id] = tensor.grad
                                 else:
                                     print(f"Gradient của tensor {tensor_id} là None")

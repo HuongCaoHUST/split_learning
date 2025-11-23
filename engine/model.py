@@ -175,8 +175,8 @@ class Split_Learning_DetectionModel(DetectionModel):
                             start_layer = self.cut_layer_ids[index] + 1
                             selected_tensor_id = self.tensor_send_ids[index]
 
-                        print("Start layer: ", start_layer)
-                        print("Selectes_tensor_id: ", selected_tensor_id)
+                        # print("Start layer: ", start_layer)
+                        # print("Selectes_tensor_id: ", selected_tensor_id)
                         if not any(tid in data_store for tid in selected_tensor_id):
                             raise ValueError("Layer 2 output not found in data_store")
                         tensor_id = next(iter(selected_tensor_id))
@@ -194,13 +194,13 @@ class Split_Learning_DetectionModel(DetectionModel):
                             x = data_store[tensor_id]
                             if not isinstance(x, torch.Tensor):
                                 raise ValueError(f"Data for tensor_id {tensor_id} is not a valid tensor")
-                            print(f"Received tensor_id {tensor_id}, shape: {x.shape}")
+                            # print(f"Received tensor_id {tensor_id}, shape: {x.shape}")
 
                             x = x.detach().clone().requires_grad_(True)
                             self.saved_tensor[tensor_id] = x
                             y[tensor_id] = x
                         
-                        print(f"Received TENSOR data_id: {self.input_data_id}")
+                        # print(f"Received TENSOR data_id: {self.input_data_id}")
                         break
                     except (pickle.UnpicklingError, ValueError) as e:
                         print(f"Error processing queue data: {e}")
@@ -239,7 +239,7 @@ class Split_Learning_DetectionModel(DetectionModel):
             if self.is_training and m.i in self.tensor_send_ids and self.layer_id == 1:
                 # data_store[m.i] = x.detach().clone().requires_grad_(True)
                 data_store[m.i] = x.detach().requires_grad_(True)
-                print(f"Shape of detached tensor at layer {m.i}: {x.detach().shape}")
+                # print(f"Shape of detached tensor at layer {m.i}: {x.detach().shape}")
 
             if m.i in embed:
                 embeddings.append(torch.nn.functional.adaptive_avg_pool2d(x, (1, 1)).squeeze(-1).squeeze(-1))
@@ -275,7 +275,7 @@ class Split_Learning_DetectionModel(DetectionModel):
                             'size': len(message)
                         })
 
-        print(f"Data_store {data_id} đã được gửi tới {queue_name}, Kích thước: {len(message)} bytes")
+        # print(f"Data_store {data_id} đã được gửi tới {queue_name}, Kích thước: {len(message)} bytes")
         return True
     
     def get_tensor_send_id (self, cut_layer):

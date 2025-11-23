@@ -42,6 +42,6 @@ learning:
   learning-rate: 0.0001
   epochs: 2
   momentum: 0.5
-  batch-size: 4
+  batch-size: 2
   control-count: 3
   worker: 8
