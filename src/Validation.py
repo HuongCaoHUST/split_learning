@@ -271,25 +271,27 @@ class ModelValidator:
         print(f"✅ Đã ghép model xong, lưu tại: {output_path}")
         return output_path
     
-    def average_yolo_models(self, best_model_layer_1, output_path):
-        print("Averaging 2 YOLO models...")
+    def average_yolo_models(self, last_model_layer_1, output_path):
+        print(f"Averaging {len(last_model_layer_1)} YOLO models...")
+        if len(last_model_layer_1) < 2:
+            raise ValueError("Cần ít nhất 2 model để merge.")
+        models = [YOLO(path) for path in last_model_layer_1]
+        state_dicts = [m.model.state_dict() for m in models]
+        base_keys = state_dicts[0].keys()
+        for sd in state_dicts[1:]:
+            if sd.keys() != base_keys:
+                raise ValueError("Các model không có cùng kiến trúc (state_dict keys khác nhau).")
 
-        model1 = YOLO(best_model_layer_1[0])
-        model2 = YOLO(best_model_layer_1[1])
-
-        sd1 = model1.model.state_dict()
-        sd2 = model2.model.state_dict()
-
-        if sd1.keys() != sd2.keys():
-            raise ValueError("Hai model không có cùng kiến trúc. Keys không giống nhau.")
-
+        # Average weights
         avg_sd = {}
-        for key in sd1.keys():
-            avg_sd[key] = (sd1[key] + sd2[key]) / 2.0
+        num_models = len(state_dicts)
+        print("Số model: ", num_models)
 
-        model_new = YOLO(best_model_layer_1[0])
+        for key in base_keys:
+            avg_sd[key] = sum(sd[key] for sd in state_dicts) / num_models
+
+        model_new = YOLO(last_model_layer_1[0])
         model_new.model.load_state_dict(avg_sd)
-
         model_new.save(output_path)
-        print(f"✔ Đã ghép và lưu model tại: {output_path}")
+        print(f"✔ Đã merge {num_models} models và lưu tại: {output_path}")
         return output_path
