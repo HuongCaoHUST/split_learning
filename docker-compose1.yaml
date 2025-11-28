@@ -32,7 +32,7 @@ services:
     volumes:
       - .:/app
     working_dir: /app
-    command: ["python", "server.py"]
+    command: ["python", "server.py", "--config", "./config.yaml"]
 
   client_2:
     container_name: split_learning_client_2

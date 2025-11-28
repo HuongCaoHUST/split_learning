@@ -1,6 +1,6 @@
 name: Split Learning
 server:
-  num-round: 3
+  num-round: 1
   clients:
     - 2
     - 1

@@ -60,7 +60,6 @@ class Trainning:
                            "message": "Finish round 1!", "round": self.current_round, "best": self.best_model, "last": self.last_model}
         # Finish epoch training, send notify to server
         self.send_to_server(notify_data)
-        self.current_round += 1
         # src.Log.print_with_color("[>>>] Finish training!", "red")
 
         broadcast_queue_name = f'reply_{self.client_id}'
@@ -72,35 +71,30 @@ class Trainning:
                 if received_data["action"] == "PAUSE":
                     return True
                 elif received_data["action"] == "CONTINUE":
+                    self.current_round += 1
                     print("Continue training next round")
                     print("Fed avg model path:", received_data["model_path"])
                     fed_model_path = received_data["model_path"]
-                    trainer_last = trainer.last  # Đường dẫn local để giữ
+                    trainer_last = trainer.last
 
-                    # 1. Load CHỈ WEIGHTS từ fed model (bỏ qua metadata/config)
-                    fed_ckpt = torch.load(fed_model_path, map_location='cpu')  # Load checkpoint
+                    fed_ckpt = torch.load(fed_model_path, map_location='cpu')
                     if isinstance(fed_ckpt, dict) and 'model' in fed_ckpt:
-                        fed_sd = fed_ckpt['model'].state_dict()  # Lấy weights từ 'model' key
+                        fed_sd = fed_ckpt['model'].state_dict()
                     else:
                         fed_sd = fed_ckpt.state_dict() if hasattr(fed_ckpt, 'state_dict') else fed_ckpt
 
-                    # 2. Load LOCAL model từ trainer.last (giữ nguyên project/save_dir local)
                     last_model = YOLO(trainer_last)
                     last_sd = last_model.model.state_dict()
 
-                    # 3. Lọc chỉ keys khớp (tên + shape) để tránh lỗi head/projection
                     filtered_sd = {k: v for k, v in fed_sd.items() if k in last_sd and v.shape == last_sd[k].shape}
 
                     print(f"Loaded {len(filtered_sd)}/{len(fed_sd)} weights (skipped mismatched keys like head).")
 
-                    # 4. Load weights vào local model
                     last_model.model.load_state_dict(filtered_sd, strict=False)
 
-                    # 5. Save với đường dẫn local → KHÔNG dính config fed
                     last_model.save(trainer_last)
 
-                    print(f"Saved to local: {trainer_last}")
-                    print(f"Local save_dir unchanged: {last_model.save_dir if hasattr(last_model, 'save_dir') else 'N/A'}")
+                    print(f"Saved to: {trainer_last}")
 
                     args = dict(resume=trainer_last,
                                 epochs=self.current_round*epochs,
@@ -111,7 +105,6 @@ class Trainning:
                     trainer = TrainerClass(overrides=args, client_id=self.client_id, layer_id=self.layer_id, num_client=num_client,
                             cut_layer=cut_layer, address=address, username=username, password=password, load_partial_model=load_partial_model, FedAvg=True)
                     trainer.train()
-                    self.current_round += 1
                     self.best_model = str(trainer.best)
                     if not self.best_model.startswith("./"):
                         self.best_model = "./" + self.best_model
@@ -167,7 +160,6 @@ class Trainning:
         # Finish epoch training, send notify to server
         self.send_to_server(notify_data)
         src.Log.print_with_color("[>>>] Finish round 1!", "red")
-        self.current_round += 1
 
         # Check training process
         broadcast_queue_name = f'reply_{self.client_id}'
@@ -180,6 +172,7 @@ class Trainning:
                     return True
                 elif received_data["action"] == "CONTINUE":
                     print("Continue training next round")
+                    self.current_round += 1
                     args = dict(resume=self.last_model,
                                 data=dataset_path,
                                 epochs=self.current_round*epochs,
@@ -191,7 +184,6 @@ class Trainning:
                     trainer = TrainerClass(overrides=args, client_id=self.client_id, layer_id=self.layer_id, num_client=num_client,
                             cut_layer=cut_layer, address=address, username=username, password=password, load_partial_model=load_partial_model, FedAvg=True)
                     trainer.train()
-                    self.current_round += 1
                     self.best_model = str(trainer.best)
                     if not self.best_model.startswith("./"):
                         self.best_model = "./" + self.best_model

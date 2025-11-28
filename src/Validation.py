@@ -293,3 +293,63 @@ class ModelValidator:
         model_new.save(output_path)
         print(f"✔ Đã ghép và lưu model tại: {output_path}")
         return output_path
+    
+    def average_4_yolo_models(self, best_model_layer_1, output_path):
+        print("Averaging 4 YOLO models...")
+        model1 = YOLO(best_model_layer_1[0])
+        model2 = YOLO(best_model_layer_1[1])
+        model3 = YOLO(best_model_layer_1[2])
+        model4 = YOLO(best_model_layer_1[3])
+
+        sd1 = model1.model.state_dict()
+        sd2 = model2.model.state_dict()
+        sd3 = model3.model.state_dict()
+        sd4 = model4.model.state_dict()
+
+        if not (sd1.keys() == sd2.keys() == sd3.keys() == sd4.keys()):
+          raise ValueError("4 model không có cùng kiến trúc. Keys không giống nhau.")
+    
+        avg_sd = {}
+        for key in sd1.keys():
+          avg_sd[key] = (sd1[key] + sd2[key] + sd3[key] + sd4[key]) / 4.0
+    
+        model_new = YOLO(best_model_layer_1[0])
+        model_new.model.load_state_dict(avg_sd)
+
+        model_new.save(output_path)
+        print(f"✔ Đã ghép và lưu model tại: {output_path}")
+        return output_path
+    
+    def average_8_yolo_models(self, best_model_layer_1, output_path):
+        print("Averaging 8 YOLO models...")
+        model1 = YOLO(best_model_layer_1[0])
+        model2 = YOLO(best_model_layer_1[1])
+        model3 = YOLO(best_model_layer_1[2])
+        model4 = YOLO(best_model_layer_1[3])
+        model5 = YOLO(best_model_layer_1[4])
+        model6 = YOLO(best_model_layer_1[5])
+        model7 = YOLO(best_model_layer_1[6])
+        model8 = YOLO(best_model_layer_1[7])
+
+        sd1 = model1.model.state_dict()
+        sd2 = model2.model.state_dict()
+        sd3 = model3.model.state_dict()
+        sd4 = model4.model.state_dict()
+        sd5 = model5.model.state_dict()
+        sd6 = model6.model.state_dict()
+        sd7 = model7.model.state_dict()
+        sd8 = model8.model.state_dict()
+
+        if not (sd1.keys() == sd2.keys() == sd3.keys() == sd4.keys() == sd5.keys() == sd6.keys() == sd7.keys() == sd8.keys()):
+          raise ValueError("4 model không có cùng kiến trúc. Keys không giống nhau.")
+    
+        avg_sd = {}
+        for key in sd1.keys():
+          avg_sd[key] = (sd1[key] + sd2[key] + sd3[key] + sd4[key] + sd5[key] + sd6[key] + sd7[key] + sd8[key]) / 8.0
+    
+        model_new = YOLO(best_model_layer_1[0])
+        model_new.model.load_state_dict(avg_sd)
+
+        model_new.save(output_path)
+        print(f"✔ Đã ghép và lưu model tại: {output_path}")
+        return output_path

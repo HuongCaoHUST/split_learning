@@ -182,32 +182,25 @@ class Server:
                 self.notify_to_clients()
 
         elif action == "NOTIFY":
-            # src.Log.print_with_color(f"[<<<] Received message from client: {message}", "blue")
-            # message = {"action": "PAUSE",
-            #             "message": "Pause training and please send your parameters",
-            #             "parameters": None}
-            # src.Log.print_with_color(f"[>>>] Sent stop training request to client {client_id}", "red")
-            # response = {"action": "STOP",
-            #             "message": "Stop training!",
-            #             "parameters": None}
-            # self.send_to_client(client_id, pickle.dumps(response))
             src.Log.print_with_color(f"[<<<] Received message from client 1: {message}", "blue")
             if layer_id == 1:
                 print("BEST MODEL FROM CLIENT:", message["best"])
                 print("LAST MODEL FROM CLIENT:", message["last"])
-                self.last_model_layer_1.append(message["last"])
+                if message.get("round") == 1:
+                    self.last_model_layer_1.append(message["last"])
                 self.count[0] += 1
             elif layer_id == 2:
                 print("BEST MODEL FROM CLIENT:", message["best"])
                 print("LAST MODEL FROM CLIENT:", message["last"])
                 print("[CHECK] ROUND: ", message.get("round"))
-                self.last_model_layer_2.append(message["last"])
+                if message.get("round") == 1:
+                    self.last_model_layer_2.append(message["last"])
                 self.count[1] += 1
                 print("COUNT:", self.count)
                 print("Received all parameter clients")
                 print("LAST MODEL LAYER 1:", self.last_model_layer_1)
                 print("LAST MODEL LAYER 2:", self.last_model_layer_2)
-                if message.get("round") <= self.num_round:
+                if message.get("round") < self.num_round:
                     avg_model_path =self.val_function.average_yolo_models(self.last_model_layer_1, "./fedavg_model_layer_1.pt")
                     message = {"action": "CONTINUE",
                         "message": "Continue training!",
@@ -250,6 +243,7 @@ class Server:
                 best = message["best"]
                 src.Log.print_with_color(f"[<<<] Received best model from client: {best}", "blue")
                 self.val_function.best_model_2.append(best)
+                self.logger.log_info(f"Done training - {best}")
                 print("BEST_2.pt:", self.val_function.best_model_2)
                 if len(self.val_function.best_model_layer_1) == self.total_clients[0] and len(self.val_function.best_model_2) == self.total_clients[1]:
                     self.val_function.validate_best_model()
