@@ -1,5 +1,6 @@
 import subprocess
 import json
+import datetime
 
 def get_running_containers():
     result = subprocess.run(['docker', 'ps', '-q'], capture_output=True, text=True, check=True)
@@ -14,7 +15,8 @@ def get_container_pid(container_id):
         return None
 
 def main():
-    output_file = "container_pids.txt"
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_file = f"container_pids_{timestamp}.txt"
     container_ids = get_running_containers()
     
     with open(output_file, 'w') as f:

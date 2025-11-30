@@ -1,0 +1,43 @@
+name: Split Learning
+server:
+  num-round: 2
+  clients:
+    - 2
+    - 1
+
+rabbit:
+  address: 172.18.0.2
+  username: user
+  password: password
+
+model:
+  task: detect
+  load_partial_model: True
+  model_path:
+    - ./yolo11n.pt
+  model_path_partial:
+    - ./yolo11n_custom.yaml
+    - ./yolo11n_custom.yaml
+  cut_layer: 
+    - 5
+    - 5
+  hybrid_training: False
+  valid_epoch_model: False
+  output_model: ./merged_model.pt
+
+dataset:
+  dataset_path:
+    - ./coco8.yaml
+    - ./coco8.yaml
+  concatenate_datasets: False
+  iid_datasets: False
+
+log_path: .
+
+learning:
+  learning-rate: 0.0001
+  epochs: 2
+  momentum: 0.5
+  batch-size: 4
+  control-count: 3
+  worker: 8

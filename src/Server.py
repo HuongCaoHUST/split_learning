@@ -131,7 +131,8 @@ class Server:
         self.channel.basic_qos(prefetch_count=1)
         self.channel.basic_consume(queue='Server_queue', on_message_callback=self.on_request)
         self.logger = src.Log.Logger(f"{log_path}/app.log")
-        self.logger.log_info("Start Training")
+        filename = os.path.basename(config_dir)
+        self.logger.log_info(f"Start Training - File config: {filename}")
         src.Utils.init_csv(f"{log_path}/log/log_validation.csv", headers=["epoch", "precision", "recall", "mAP50", "mAP50-95"])
 
         src.Log.print_with_color(f"Server is waiting for {self.total_clients} clients.", "green")
@@ -245,10 +246,10 @@ class Server:
                 self.val_function.best_model_2.append(best)
                 self.logger.log_info(f"Done training - {best}")
                 print("BEST_2.pt:", self.val_function.best_model_2)
-                if len(self.val_function.best_model_layer_1) == self.total_clients[0] and len(self.val_function.best_model_2) == self.total_clients[1]:
-                    self.val_function.validate_best_model()
+                # if len(self.val_function.best_model_layer_1) == self.total_clients[0] and len(self.val_function.best_model_2) == self.total_clients[1]:
+                #     self.val_function.validate_best_model()
 
-                self.val_function.validate_epoch_model()
+                # self.val_function.validate_epoch_model()
                 src.Utils.calculate_latency()
                 sys.exit()
 
