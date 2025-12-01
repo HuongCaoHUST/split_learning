@@ -95,8 +95,6 @@ class Split_Learning_RTDETRTrainer(Split_Learning_DetectionTrainer):
         Returns:
             (RTDETRDetectionModel): Initialized model.
         """
-        print("[CHECK] Layer ID: ", self.layer_id)
-        print("[CHECK] Cut Layer: ", self.cut_layer)  
         model = Split_Learning_RTDETRDetectionModel(cfg, nc=self.data["nc"], ch=self.data["channels"], verbose=verbose and RANK == -1,
                                                     layer_id=getattr(self, 'layer_id', None),
                                                     client_id=getattr(self, 'client_id', None),

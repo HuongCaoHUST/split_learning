@@ -351,10 +351,18 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                     # Forward
                     with autocast(self.amp):
                         batch = self.preprocess_batch(batch)
+
+                        img = batch["img"]
+                        bs = len(img)
+                        batch_idx = batch["batch_idx"]
+                        gt_groups = [(batch_idx == i).sum().item() for i in range(bs)]
+                        batch["gt_groups"] = gt_groups
+
                         label_data = {
                             "batch_idx": batch["batch_idx"],
                             "bboxes": batch["bboxes"],
-                            "cls": batch["cls"]
+                            "cls": batch["cls"],
+                            "gt_groups":batch["gt_groups"],
                         }
                         if self.layer_id == 1:
                             data_id = uuid.uuid4()
@@ -380,7 +388,7 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                         if not success_grad:
                             print("Không thấy Gradient.")
                             return
-                        
+                        print("CHECK Self.model.data_store: ", gradient_dict.keys())
                         tensor_list = [self.model.data_store[t_id] for t_id in gradient_dict.keys()]
                         grad_list = [gradient_dict[t_id] for t_id in gradient_dict.keys()]
 
@@ -402,7 +410,7 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                             if not success_grad:
                                 print("Không thấy Gradient.")
                                 return
-                            
+                        
                             tensor_list = [self.model.data_store[t_id] for t_id in gradient_dict.keys()]
                             grad_list = [gradient_dict[t_id] for t_id in gradient_dict.keys()]
 
@@ -546,6 +554,7 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                     # Forward
                     with autocast(self.amp):
                         # batch = self.preprocess_batch(batch)
+                        print("CHECKING BATCH NEW: ", batch["gt_groups"]) 
                         batch["img"] = torch.zeros((1, 3, 640, 640)).to(self.device)
                         loss, self.loss_items = self.model(batch)
                         self.loss = loss.sum()
@@ -561,6 +570,7 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                     if self.layer_id == 2:
                         if hasattr(self.model, 'saved_tensor'):
                             gradient_store = {}
+                            print("CHECK SAVED TENSOR: ", self.model.saved_tensor)
                             for tensor_id, tensor in self.model.saved_tensor.items():
                                 if tensor.grad is not None:
                                     print(f"Gradient shape của tensor {tensor_id}: {tensor.grad.shape}")
