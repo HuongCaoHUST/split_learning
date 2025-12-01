@@ -181,3 +181,4 @@ test_training.py
 /train 13 - 10
 /train 16 -10
 /train_results
+*.txt

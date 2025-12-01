@@ -108,7 +108,7 @@ class Split_Learning_DetectionModel(DetectionModel):
         self.inplace = self.yaml.get("inplace", True)
         self.end2end = getattr(self.model[-1], "end2end", False)
 
-        # Build strides (giữ nguyên code gốc)
+        # Build strides
         m = self.model[-1]  
         if isinstance(m, Detect):
             s = 256  
@@ -279,73 +279,73 @@ class Split_Learning_DetectionModel(DetectionModel):
         return True
     
     def get_tensor_send_id (self, cut_layer):
-        # tensor_send_id = []
-        # mf_values = []
-        # layer_indices = []
-        # for idx, m in enumerate(self.model):
-        #     f = m.f
-        #     if f != -1:
-        #         if isinstance(f, int):
-        #             f = [f]
-        #         for fi in f:
-        #             if fi != -1:
-        #                 layer_indices.append(idx)
-        #                 mf_values.append(fi)
-        # mf_values_sorted = sorted(mf_values)
+        tensor_send_id = []
+        mf_values = []
+        layer_indices = []
+        for idx, m in enumerate(self.model):
+            f = m.f
+            if f != -1:
+                if isinstance(f, int):
+                    f = [f]
+                for fi in f:
+                    if fi != -1:
+                        layer_indices.append(idx)
+                        mf_values.append(fi)
+        mf_values_sorted = sorted(mf_values)
 
-        # for value in mf_values_sorted:
-        #     if value < cut_layer:
-        #         tensor_send_id.append(value)
+        for value in mf_values_sorted:
+            if value < cut_layer:
+                tensor_send_id.append(value)
 
-        # indices_to_mf = dict(zip(layer_indices, mf_values))
-        # for idx, val in indices_to_mf.items():
-        #     if idx <=cut_layer:
-        #         tensor_send_id.remove(val)
+        indices_to_mf = dict(zip(layer_indices, mf_values))
+        for idx, val in indices_to_mf.items():
+            if idx <=cut_layer:
+                tensor_send_id.remove(val)
 
-        # tensor_send_id.append(cut_layer)
-        # print ("SEND tensor id: ", tensor_send_id)
-        # return tensor_send_id
+        tensor_send_id.append(cut_layer)
+        print ("SEND tensor id: ", tensor_send_id)
+        return tensor_send_id
 
-        if cut_layer <=3:
-            return [cut_layer]
-        elif cut_layer == 4:
-            return [cut_layer]
-        elif cut_layer == 5:
-            return [4, cut_layer]
-        elif cut_layer == 6:
-            return [4, cut_layer]
-        elif cut_layer == 7:
-            return [4, 6, cut_layer]
-        elif cut_layer == 8:
-            return [4, 6, cut_layer]
-        elif cut_layer == 9:
-            return [4, 6, cut_layer]
-        elif cut_layer == 10:
-            return [4, 6, cut_layer]
-        elif cut_layer == 11:
-            return [4, 6, 10, cut_layer]
-        elif cut_layer == 12:
-            return [4, 10, cut_layer]
-        elif cut_layer == 13:
-            return [4, 10, cut_layer]
-        elif cut_layer == 14:
-            return [4, 10, 13, cut_layer]
-        elif cut_layer == 15:
-            return [10, 13, cut_layer]
-        elif cut_layer == 16:
-            return [10, 13, cut_layer]
-        elif cut_layer == 17:
-            return [10, 13, 16, cut_layer]
-        elif cut_layer == 18:
-            return [10, 16, cut_layer]
-        elif cut_layer == 19:
-            return [10, 16, cut_layer]
-        elif cut_layer == 20:
-            return [10, 16, 19, cut_layer]
-        elif cut_layer == 21:
-            return [16, 19, cut_layer]
-        elif cut_layer == 22:
-            return [16, 19, cut_layer]
+        # if cut_layer <=3:
+        #     return [cut_layer]
+        # elif cut_layer == 4:
+        #     return [cut_layer]
+        # elif cut_layer == 5:
+        #     return [4, cut_layer]
+        # elif cut_layer == 6:
+        #     return [4, cut_layer]
+        # elif cut_layer == 7:
+        #     return [4, 6, cut_layer]
+        # elif cut_layer == 8:
+        #     return [4, 6, cut_layer]
+        # elif cut_layer == 9:
+        #     return [4, 6, cut_layer]
+        # elif cut_layer == 10:
+        #     return [4, 6, cut_layer]
+        # elif cut_layer == 11:
+        #     return [4, 6, 10, cut_layer]
+        # elif cut_layer == 12:
+        #     return [4, 10, cut_layer]
+        # elif cut_layer == 13:
+        #     return [4, 10, cut_layer]
+        # elif cut_layer == 14:
+        #     return [4, 10, 13, cut_layer]
+        # elif cut_layer == 15:
+        #     return [10, 13, cut_layer]
+        # elif cut_layer == 16:
+        #     return [10, 13, cut_layer]
+        # elif cut_layer == 17:
+        #     return [10, 13, 16, cut_layer]
+        # elif cut_layer == 18:
+        #     return [10, 16, cut_layer]
+        # elif cut_layer == 19:
+        #     return [10, 16, cut_layer]
+        # elif cut_layer == 20:
+        #     return [10, 16, 19, cut_layer]
+        # elif cut_layer == 21:
+        #     return [16, 19, cut_layer]
+        # elif cut_layer == 22:
+        #     return [16, 19, cut_layer]
     
     
     def start_thread(self, forward_queue):

@@ -1,6 +1,6 @@
 name: Split Learning
 server:
-  num-round: 2
+  num-round: 1
   clients:
     - 2
     - 1
@@ -16,11 +16,11 @@ model:
   model_path:
     - ./yolo11n.pt
   model_path_partial:
-    - ./yolo11n_custom.yaml
-    - ./yolo11n_custom.yaml
+    - ./rtdetr-l_custom.yaml
+    - ./rtdetr-l_custom.yaml
   cut_layer: 
-    - 5
-    - 5
+    - 9
+    - 9
   hybrid_training: False
   valid_epoch_model: False
   output_model: ./merged_model.pt
