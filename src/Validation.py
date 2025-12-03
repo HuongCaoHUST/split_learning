@@ -288,7 +288,7 @@ class ModelValidator:
                 avg_sd[key] += sds[i][key]
             avg_sd[key] = avg_sd[key] / num_models
     
-        model_new = YOLO(last_model_layer_1[[0]])
+        model_new = YOLO(last_model_layer_1[0])
         model_new.model.load_state_dict(avg_sd)
 
         model_new.save(output_path)
