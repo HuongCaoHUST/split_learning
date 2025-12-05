@@ -1,12 +1,13 @@
 from ultralytics import YOLO
 import cv2
+import time
 
 model = YOLO("yolo11n.pt")
 cap = cv2.VideoCapture("bee_video.mp4")
 
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 out = cv2.VideoWriter("output.mp4", fourcc, 30, (640, 480))
-
+start_time = time.time()
 while True:
     ret, frame = cap.read()
     if not ret:
@@ -16,5 +17,8 @@ while True:
     annotated = results[0].plot()
     out.write(annotated)
 
+end_time = time.time()
+total = end_time - start_time
+print(f"Total processing time: {total:.2f} seconds")
 cap.release()
 out.release()
