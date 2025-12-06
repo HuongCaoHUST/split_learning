@@ -2,7 +2,7 @@ from engine.yolo.predict import Split_Learning_DetectionPredictor
 import time
 
 args = dict(model="fedavg_model_layer_1.pt", source="./video/bee_video.mp4")
-predictor = Split_Learning_DetectionPredictor(overrides=args)
+predictor = Split_Learning_DetectionPredictor(overrides=args, address="172.18.0.2", username="user", password="password")
 start_time = time.time()
 predictor.predict_cli()
 end_time = time.time()

@@ -11,6 +11,7 @@ import pickle
 import uuid
 import re
 from typing import List
+import gc
 
 class Split_Learning_DetectionPredictor(DetectionPredictor):
     def __init__(self, overrides, client_id=None, layer_id=None, num_client=None, cut_layer=None, address=None, username=None, password=None, load_partial_model=False):
@@ -25,8 +26,8 @@ class Split_Learning_DetectionPredictor(DetectionPredictor):
         self.load_partial_model = load_partial_model
         Utils.init_csv('./log/latency.csv', ['batch_id', 'start', 'end', 'latency'])
         Utils.init_csv('./log/com_cost.csv', ['batch_id', 'label/tensor', 'size'])
-        self.channel = Utils.connect_rabbitmq(self.address, self.username, self.password)
         super().__init__(overrides=overrides)
+        self.channel = Utils.connect_rabbitmq(self.address, self.username, self.password)
         self.speed = {}
 
     def inference(self, im: torch.Tensor, *args, **kwargs):
@@ -85,9 +86,9 @@ class Split_Learning_DetectionPredictor(DetectionPredictor):
                 with profilers[1]:
                     preds = self.inference(im, *args, **kwargs)
 
-                    # success = self.send_to_intermediate_queue(preds)
-                    # if not success:
-                    #     print(f"Sending to intermediate queue failed.")
+                    success = self.send_to_intermediate_queue_2(preds)
+                    if not success:
+                        print(f"Sending to intermediate queue failed.")
 
                     # torch.save({f"feat{i}": p for i, p in enumerate(preds)}, "features_intermediate.pth")
                     # print("Saved pred_features.pth")
@@ -192,7 +193,7 @@ class Split_Learning_DetectionPredictor(DetectionPredictor):
 
     def send_to_intermediate_queue(self, data_store):
         data_id = uuid.uuid4()
-        queue_name = f'intermediate_queue_{self.layer_id}'
+        queue_name = f'Server_queue'
         self.channel.queue_declare(queue_name, durable=False)
 
         message = pickle.dumps(
@@ -206,8 +207,41 @@ class Split_Learning_DetectionPredictor(DetectionPredictor):
             body=message
         )
         print(f"Data_store {data_id} đã được gửi tới {queue_name}, Kích thước: {len(message)} bytes")
+        data_store = None
         return True
     
+    def send_to_intermediate_queue_2(self, preds):
+        try:
+            data_id = uuid.uuid4()
+            queue_name = 'Server_queue'
+            self.channel.queue_declare(queue_name, durable=False)
+
+            # Chuyển từng layer thành numpy + float16 để giảm size
+            data = {
+                "data_id": str(data_id),
+                "p3": preds[0].detach().cpu().numpy().astype('float16'),
+                "p5": preds[1].detach().cpu().numpy().astype('float16'),
+            }
+
+            message = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
+
+            self.channel.basic_publish(
+                exchange='',
+                routing_key=queue_name,
+                body=message
+            )
+
+            print(f"Sent {data_id}, size = {len(message)} bytes")
+
+            return True
+
+        finally:
+            del preds
+            del data
+            del message
+            gc.collect()
+
+
     def write_results(self, i: int, p: Path, im: torch.Tensor, s: List[str]) -> str:
         """
         Write inference results to a file or directory.
