@@ -2,7 +2,7 @@ import time
 import pickle
 import pika
 from tqdm import tqdm
-from engine.train import Split_Learning_DetectionTrainer, Split_Learning_SegmentationTrainer, Split_Learning_ClassificationTrainer
+from engine.yolo.train import Split_Learning_DetectionTrainer, Split_Learning_SegmentationTrainer, Split_Learning_ClassificationTrainer
 import src.Log
 from ultralytics import YOLO
 import torch

@@ -17,14 +17,14 @@ from ultralytics.models.yolo.detect import DetectionTrainer
 from ultralytics.models.yolo.classify import ClassificationTrainer
 from typing import Optional
 from ultralytics.utils import RANK
-from engine.model import Split_Learning_DetectionModel, Split_Learning_SegmentationModel, Split_Learning_ClassificationModel
+from engine.yolo.model import Split_Learning_DetectionModel, Split_Learning_SegmentationModel, Split_Learning_ClassificationModel
 from ultralytics.models.yolo.segment import SegmentationValidator
 from ultralytics import __version__
 from ultralytics.utils.checks import check_amp, check_imgsz
 from ultralytics.data.utils import check_cls_dataset
 from ultralytics.data import build_dataloader
 from ultralytics.utils.plotting import plot_results
-from engine.data import check_det_dataset
+from engine.yolo.data import check_det_dataset
 from copy import deepcopy
 from datetime import datetime
 from src import Utils

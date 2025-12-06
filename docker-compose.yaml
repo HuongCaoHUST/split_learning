@@ -45,7 +45,7 @@ services:
     volumes:
       - .:/app
     working_dir: /app
-    command: ["python", "client.py", "--layer_id", "2"]
+    command: ["python", "test_predict_with_cv.py"]
 
   client_1:
     image: split_learning-server
