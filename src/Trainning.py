@@ -33,7 +33,7 @@ class Trainning:
         from engine.yolo.predict import Split_Learning_DetectionPredictor
         import time
 
-        args = dict(model="fedavg_model_layer_1.pt", source="./bus.jpg")
+        args = dict(model="fedavg_model_layer_1.pt", source="./video/bee_video.mp4", half=True)
         predictor = Split_Learning_DetectionPredictor(overrides=args, layer_id=self.layer_id, address=address, username=username, password=password)
         start_time = time.time()
         predictor.predict_cli()

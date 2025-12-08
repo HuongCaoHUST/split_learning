@@ -18,8 +18,6 @@ class SplitDetectionModel(DetectionModel):
         Returns:
             (torch.Tensor): The last output of the model.
         """
-        print("P4 shape at start of _predict_once: ", x[0].shape)
-        print("P5 shape at start of _predict_once: ", x[1].shape)
         y, dt, embeddings = [], [], []  # outputs
         y = [None] * 6
         y[4] = x[0]

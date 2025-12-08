@@ -33,6 +33,7 @@ class Split_Learning_DetectionPredictor(DetectionPredictor):
         self.channel = Utils.connect_rabbitmq(self.address, self.username, self.password)
         self.speed = {}
         self.is_inference = False
+        self.is_done = False
 
     def inference(self, im: torch.Tensor, *args, **kwargs):
         """Run inference on a given image using the specified model and arguments."""
@@ -83,91 +84,6 @@ class Split_Learning_DetectionPredictor(DetectionPredictor):
             )
             self.run_callbacks("on_predict_start")
 
-            if self.layer_id == 2:
-                self.count = None
-                self.source_type = SimpleNamespace(
-                    stream=False,
-                    screenshot=False,
-                    from_img=False,
-                    tensor=False,
-                )
-                self.dataset = SimpleNamespace(mode="image")
-                while self.is_inference:
-                    self.run_callbacks("on_predict_batch_start")
-                    # paths, im0s, s = self.batch
-
-                    # Receive data from intermediate queue
-                    with profilers[0]:
-                        data_id, p3, p5, paths, s = self.wait_for_intermediate_queue()
-                        self.is_inference = False
-                        p3 = torch.from_numpy(p3).to(self.device)
-                        p5 = torch.from_numpy(p5).to(self.device)
-                        im = [p3, p5]
-                        im0s = [np.zeros((1080, 810, 3), dtype=np.uint8) for _ in range(16)]
-                    
-                        self.batch = (paths, im0s, s)
-
-                    # Inference
-                    with profilers[1]:
-                        preds = self.inference(im, *args, **kwargs)
-
-                        if self.layer_id == 1:
-                            success = self.send_to_intermediate_queue_2(preds)
-                            if not success:
-                                print(f"Sending to intermediate queue failed.")
-
-                        # torch.save({f"feat{i}": p for i, p in enumerate(preds)}, "features_intermediate.pth")
-
-                        if self.args.embed:
-                            yield from [preds] if isinstance(preds, torch.Tensor) else preds  # yield embedding tensors
-                            continue
-                    
-                    if self.layer_id == 2:
-                        # Postprocess
-                        with profilers[2]:
-                            im = self.preprocess(im0s)
-                            self.results = self.postprocess(preds, im, im0s)
-                        self.run_callbacks("on_predict_postprocess_end")
-
-                        # Visualize, save, write results
-                        n = len(im0s)
-                        try:
-                            for i in range(1):
-                                self.seen += 1
-                                self.results[i].speed = {
-                                    "preprocess": profilers[0].dt * 1e3 / n,
-                                    "inference": profilers[1].dt * 1e3 / n,
-                                    "postprocess": profilers[2].dt * 1e3 / n,
-                                }
-                                if self.args.verbose or self.args.save or self.args.save_txt or self.args.show:
-                                    s[i] += self.write_results(i, Path(paths[i]), im, s)
-                        except StopIteration:
-                            break
-
-                        # Print batch results
-                        if self.args.verbose:
-                            LOGGER.info("\n".join(s))
-
-                        self.run_callbacks("on_predict_batch_end")
-                        yield from self.results
-                    else:
-                        n = len(im0s)
-                        try:
-                            for i in range(n):
-                                self.seen += 1
-                                self.speed = {
-                                    "preprocess": profilers[0].dt * 1e3 / n,
-                                    "inference": profilers[1].dt * 1e3 / n,
-                                }
-                                if self.args.verbose or self.args.save or self.args.save_txt or self.args.show:
-                                    s[i] += self.write_results(i, Path(paths[i]), im, s)
-                        except StopIteration:
-                            break
-                        # Print batch results
-                        if self.args.verbose:
-                            LOGGER.info("\n".join(s))
-
-                        self.run_callbacks("on_predict_batch_end")
             if self.layer_id == 1:
                 for self.batch in self.dataset:
                     self.run_callbacks("on_predict_batch_start")
@@ -181,61 +97,94 @@ class Split_Learning_DetectionPredictor(DetectionPredictor):
                         preds = self.inference(im, *args, **kwargs)
 
                         if self.layer_id == 1:
-                            success = self.send_to_intermediate_queue_2(preds, paths, s, self.dataset.count)
+                            success = self.send_to_intermediate_queue(preds, paths, s, self.dataset.count)
                             if not success:
                                 print(f"Sending to intermediate queue failed.")
-
-                        # torch.save({f"feat{i}": p for i, p in enumerate(preds)}, "features_intermediate.pth")
 
                         if self.args.embed:
                             yield from [preds] if isinstance(preds, torch.Tensor) else preds  # yield embedding tensors
                             continue
                     
-                    if self.layer_id == 2:
-                        # Postprocess
-                        with profilers[2]:
-                            self.results = self.postprocess(preds, im, im0s)
-                        self.run_callbacks("on_predict_postprocess_end")
+                    n = len(im0s)
+                    try:
+                        for i in range(n):
+                            self.seen += 1
+                            self.speed = {
+                                "preprocess": profilers[0].dt * 1e3 / n,
+                                "inference": profilers[1].dt * 1e3 / n,
+                            }
+                            if self.args.verbose or self.args.save or self.args.save_txt or self.args.show:
+                                s[i] += self.write_results(i, Path(paths[i]), im, s)
+                    except StopIteration:
+                        break
 
-                        # Visualize, save, write results
-                        n = len(im0s)
-                        try:
-                            for i in range(n):
-                                self.seen += 1
-                                self.results[i].speed = {
-                                    "preprocess": profilers[0].dt * 1e3 / n,
-                                    "inference": profilers[1].dt * 1e3 / n,
-                                    "postprocess": profilers[2].dt * 1e3 / n,
-                                }
-                                if self.args.verbose or self.args.save or self.args.save_txt or self.args.show:
-                                    s[i] += self.write_results(i, Path(paths[i]), im, s)
-                        except StopIteration:
+                    # Print batch results
+                    if self.args.verbose:
+                        LOGGER.info("\n".join(s))
+                    self.run_callbacks("on_predict_batch_end")
+                
+                self.send_to_intermediate_queue(is_done=True)
+
+            if self.layer_id == 2:
+                self.count = None
+                self.source_type = SimpleNamespace(
+                    stream=False,
+                    screenshot=False,
+                    from_img=False,
+                    tensor=False,
+                )
+                self.dataset = SimpleNamespace(mode="video", fps=30)
+                while True:
+                    self.run_callbacks("on_predict_batch_start")
+
+                    # Receive data from intermediate queue
+                    with profilers[0]:
+                        data_id, p3, p5, paths, s, is_done = self.wait_for_intermediate_queue()
+                        if is_done:
                             break
 
-                        # Print batch results
-                        if self.args.verbose:
-                            LOGGER.info("\n".join(s))
+                        p3 = torch.tensor(p3, dtype=torch.float32, device=self.device)
+                        p5 = torch.tensor(p5, dtype=torch.float32, device=self.device)
 
-                        self.run_callbacks("on_predict_batch_end")
-                        yield from self.results
-                    else:
-                        n = len(im0s)
-                        try:
-                            for i in range(n):
-                                self.seen += 1
-                                self.speed = {
-                                    "preprocess": profilers[0].dt * 1e3 / n,
-                                    "inference": profilers[1].dt * 1e3 / n,
-                                }
-                                if self.args.verbose or self.args.save or self.args.save_txt or self.args.show:
-                                    s[i] += self.write_results(i, Path(paths[i]), im, s)
-                        except StopIteration:
-                            break
-                        # Print batch results
-                        if self.args.verbose:
-                            LOGGER.info("\n".join(s))
+                        im = [p3, p5]
+                        im0s = [np.zeros((1080, 810, 3), dtype=np.uint8) for _ in range(16)]
+                    
+                        self.batch = (paths, im0s, s)
 
-                        self.run_callbacks("on_predict_batch_end")
+                    # Inference
+                    with profilers[1]:
+                        preds = self.inference(im, *args, **kwargs)
+                        if self.args.embed:
+                            yield from [preds] if isinstance(preds, torch.Tensor) else preds  # yield embedding tensors
+                            continue
+                    
+                    # Postprocess
+                    with profilers[2]:
+                        im = self.preprocess(im0s)
+                        self.results = self.postprocess(preds, im, im0s)
+                    self.run_callbacks("on_predict_postprocess_end")
+
+                    # Visualize, save, write results
+                    n = len(self.results)
+                    try:
+                        for i in range(1):
+                            self.seen += 1
+                            self.results[i].speed = {
+                                "preprocess": profilers[0].dt * 1e3 / n,
+                                "inference": profilers[1].dt * 1e3 / n,
+                                "postprocess": profilers[2].dt * 1e3 / n,
+                            }
+                            if self.args.verbose or self.args.save or self.args.save_txt or self.args.show:
+                                s[i] += self.write_results(i, Path(paths[i]), im, s)
+                    except StopIteration:
+                        break
+
+                    # Print batch results
+                    if self.args.verbose:
+                        LOGGER.info("\n".join(s))
+
+                    self.run_callbacks("on_predict_batch_end")
+                    yield from self.results
 
         # Release assets
         for v in self.vid_writer.values():
@@ -284,43 +233,25 @@ class Split_Learning_DetectionPredictor(DetectionPredictor):
         if hasattr(self.model, "imgsz") and not getattr(self.model, "dynamic", False):
             self.args.imgsz = self.model.imgsz  # reuse imgsz from export metadata
         self.model.eval()
-
-    def send_to_intermediate_queue(self, data_store):
-        data_id = uuid.uuid4()
-        queue_name = f'Server_queue'
-        self.channel.queue_declare(queue_name, durable=False)
-
-        message = pickle.dumps(
-            {"data_id": data_id,
-            "data_store": data_store}
-        )
-
-        self.channel.basic_publish(
-            exchange='',
-            routing_key=queue_name,
-            body=message
-        )
-        print(f"Data_store {data_id} đã được gửi tới {queue_name}, Kích thước: {len(message)} bytes")
-        data_store = None
-        return True
     
-    def send_to_intermediate_queue_2(self, preds, paths=None, s=None, count=None):
+    def send_to_intermediate_queue(self, preds = None, paths=None, s=None, count=None, is_done=False):
         try:
             data_id = uuid.uuid4()
             queue_name = f'intermediate_queue_{self.layer_id}'
             self.channel.queue_declare(queue_name, durable=False)
-
-            data = {
-                "data_id": str(data_id),
-                "p4": preds[0].detach().cpu().numpy(),
-                "p5": preds[1].detach().cpu().numpy(),
-                # "p4": preds[0].detach().cpu().numpy().astype('float16'),
-                # "p5": preds[1].detach().cpu().numpy().astype('float16'),
-                "paths": paths,
-                "s": s,
-                "count": count
-            }
-
+            if not is_done:
+                data = {
+                    "data_id": str(data_id),
+                    "p4": preds[0].detach().cpu().numpy(),
+                    "p5": preds[1].detach().cpu().numpy(),
+                    "paths": paths,
+                    "s": s,
+                    "count": count,
+                }
+            else:
+                data = {
+                    "is_done": True,
+                }
             message = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
 
             self.channel.basic_publish(
@@ -345,12 +276,13 @@ class Split_Learning_DetectionPredictor(DetectionPredictor):
             method_frame, header_frame, body = self.channel.basic_get(queue=queue_name, auto_ack=True)
             if method_frame and body:
                 received_data = pickle.loads(body)
-                data_id = received_data["data_id"]
-                p4 = received_data["p4"]
-                p5 = received_data["p5"]
-                paths = received_data["paths"]
-                s = received_data["s"]
-                return data_id, p4, p5, paths, s
+                data_id = received_data.get("data_id", None)
+                p4 = received_data.get("p4", None)
+                p5 = received_data.get("p5", None)
+                paths = received_data.get("paths", [])
+                s = received_data.get("s", None)
+                is_done = received_data.get("is_done", None)
+                return data_id, p4, p5, paths, s, is_done
             else:
                 time.sleep(0.5)
 
@@ -375,7 +307,6 @@ class Split_Learning_DetectionPredictor(DetectionPredictor):
             >>> results = predictor.predict("path/to/image.jpg")
             >>> processed_results = predictor.postprocess(preds, img, orig_imgs)
         """
-        print("New postprocess called")
         save_feats = getattr(self, "_feats", None) is not None
         preds = ops.non_max_suppression(
             preds,

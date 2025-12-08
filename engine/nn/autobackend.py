@@ -48,6 +48,7 @@ class AutoBackend_SplitModel(AutoBackend):
 
         # PyTorch
         if self.pt or self.nn_module:
+            # self.model.half()
             if self.layer_id == 1:
                 outputs = []
                 x = im
