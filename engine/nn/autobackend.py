@@ -1,6 +1,7 @@
 from ultralytics.nn.autobackend import AutoBackend
-
+from engine.model.model import SplitDetectionModel
 from typing import Any, List, Optional, Union
+from ultralytics.nn.tasks import attempt_load_weights
 import numpy as np
 import torch
 from PIL import Image
@@ -10,6 +11,9 @@ class AutoBackend_SplitModel(AutoBackend):
         self.layer_id = layer_id
         self.cut_layer = cut_layer
         super().__init__(*args, **kwargs)
+
+        if self.layer_id == 2:
+            self.model.__class__ = SplitDetectionModel
 
     def forward(
         self,
@@ -32,7 +36,11 @@ class AutoBackend_SplitModel(AutoBackend):
         Returns:
             (torch.Tensor | List[torch.Tensor]): The raw output tensor(s) from the model.
         """
-        b, ch, h, w = im.shape  # batch, channel, height, width
+        if self.layer_id == 1:
+            b, ch, h, w = im.shape  # batch, channel, height, width
+        else:
+            b, ch, h, w = im[0].shape  # batch, channel, height, width
+
         if self.fp16 and im.dtype != torch.float16:
             im = im.half()  # to FP16
         if self.nhwc:
@@ -40,15 +48,17 @@ class AutoBackend_SplitModel(AutoBackend):
 
         # PyTorch
         if self.pt or self.nn_module:
-            # y = self.model(im, augment=augment, visualize=visualize, embed=embed, **kwargs)
-            outputs = []
-            x = im
-            for i, m in enumerate(self.model.model):
-                x = m(x)
-                if i == 3 or i == 5:
-                    outputs.append(x)
-
-            y = outputs
+            if self.layer_id == 1:
+                outputs = []
+                x = im
+                for i, m in enumerate(self.model.model):
+                    x = m(x)
+                    if i == 4 or i == 5:
+                        outputs.append(x)
+                y = outputs
+            else:
+                y = self.model(im, augment=augment, visualize=visualize, embed=embed, **kwargs)
+                
 
         # TorchScript
         elif self.jit:

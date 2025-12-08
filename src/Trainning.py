@@ -30,6 +30,17 @@ class Trainning:
     def train_on_first_layer(self, model_path, dataset_path, num_client, cut_layer, num_round, task, epochs, batch_size, worker, address = None, username = None, password = None, load_partial_model=False, valid_epoch_model = -1):
         src.Log.print_with_color(f"--- START TRAINING FIRST LAYER --- CURREN ROUND: {self.current_round} ---", "green")
 
+        from engine.yolo.predict import Split_Learning_DetectionPredictor
+        import time
+
+        args = dict(model="fedavg_model_layer_1.pt", source="./bus.jpg")
+        predictor = Split_Learning_DetectionPredictor(overrides=args, layer_id=self.layer_id, address=address, username=username, password=password)
+        start_time = time.time()
+        predictor.predict_cli()
+        end_time = time.time()
+        total = end_time - start_time
+        print(f"Total processing time: {total:.2f} seconds")
+
         TRAINER = {
             "detect": Split_Learning_DetectionTrainer,
             "segment": Split_Learning_SegmentationTrainer,
@@ -127,6 +138,16 @@ class Trainning:
         print('Waiting for intermediate output. To exit press CTRL+C')
 
         src.Log.print_with_color("--- START TRAINING SECOND LAYER ---", "green")
+
+        from engine.yolo.predict import Split_Learning_DetectionPredictor
+        import time
+        args = dict(model="yolo11n.pt", imgsz = 640)
+        predictor = Split_Learning_DetectionPredictor(overrides=args, layer_id=self.layer_id, address=address, username=username, password=password)
+        start_time = time.time()
+        predictor.predict_cli()
+        end_time = time.time()
+        total = end_time - start_time
+        print(f"Total processing time: {total:.2f} seconds")
 
         TRAINER = {
             "detect": Split_Learning_DetectionTrainer,
