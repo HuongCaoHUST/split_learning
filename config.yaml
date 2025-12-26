@@ -2,7 +2,7 @@ name: Split Learning
 server:
   num-round: 2
   clients:
-    - 1
+    - 2
     - 1
 
 rabbit:

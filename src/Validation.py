@@ -247,30 +247,6 @@ class ModelValidator:
         print(f"Đã ghép xong model và lưu tại: {output_path}")
         return output_path
     
-
-    def merge_partial_fedavg(self, model_paths_layer1, model_path_layer2, cut_layer, output_path):
-        state_dicts = []
-        for path in model_paths_layer1:
-            model = YOLO(path)
-            state_dicts.append({k: v.cpu() for k, v in model.model.state_dict().items()})
-        avg_state_dict = {}
-        for key in state_dicts[0].keys():
-            try:
-                layer_num = int(key.split('.')[0])
-                if layer_num <= cut_layer:
-                    weights = [sd[key] for sd in state_dicts]
-                    avg_state_dict[key] = sum(weights) / len(weights)
-            except:
-                continue
-
-        model2 = YOLO(model_path_layer2)
-        base_state = model2.model.state_dict()
-        base_state.update(avg_state_dict)
-        model2.model.load_state_dict(base_state)
-        model2.save(output_path)                    
-        print(f"✅ Đã ghép model xong, lưu tại: {output_path}")
-        return output_path
-    
     def average_yolo_models(self, last_model_layer_1, output_path):
         num_models = len(last_model_layer_1)
         models = []
