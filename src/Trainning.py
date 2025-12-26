@@ -4,7 +4,11 @@ import pika
 from tqdm import tqdm
 from engine.train import Split_Learning_DetectionTrainer, Split_Learning_SegmentationTrainer, Split_Learning_ClassificationTrainer
 import src.Log
+import src.Utils
 from ultralytics import YOLO
+import mlflow
+import mlflow.pytorch
+from ultralytics import settings
 import torch
 
 class Trainning:
@@ -19,8 +23,12 @@ class Trainning:
         self.time_event = []
         self.best_model = None
         self.current_round = 1
+        from ultralytics import settings
+        
+        settings.update({"mlflow": False})
+        mlflow.set_tracking_uri("http://14.225.254.18:5000")
+        mlflow.set_experiment("Split_Learning")
     
-
     def send_to_server(self, message):
         print (f"[>>>] Client {self.client_id} send message to server: {message}")
         self.channel.basic_publish(exchange='',
@@ -142,13 +150,34 @@ class Trainning:
                     batch=batch_size,
                     project = './runs/detect',
                     workers = worker,
-                    save_period = valid_epoch_model
-                    # optimizer='AdamW',
+                    save_period = valid_epoch_model,
+                    optimizer='SGD'
                     )
+        mlflow.log_params({
+            "task": task,
+            "client_id": self.client_id,
+            "layer_id": self.layer_id,
+            "num_client": num_client,
+            "cut_layer": cut_layer,
+            "epochs": epochs,
+            "batch_size": batch_size,
+            "workers": worker,
+            "pretrained": "./yolo11n.pt",
+            "dataset": dataset_path
+        })
         trainer = TrainerClass(overrides=args, client_id=self.client_id,
-                                         layer_id=self.layer_id, num_client=num_client,
-                                         cut_layer=cut_layer, address=address, username=username, password=password, load_partial_model=load_partial_model)
+                                        layer_id=self.layer_id, num_client=num_client,
+                                        cut_layer=cut_layer, address=address, username=username, password=password, load_partial_model=load_partial_model)
         trainer.train()
+        save_dir = trainer.save_dir
+        results_csv = save_dir / "results.csv"
+
+        src.Utils.log_results_csv_to_mlflow(
+            results_csv=results_csv,
+            round_id=self.current_round,
+            epochs_per_round=epochs
+        )
+
         self.best_model = str(trainer.best)
         if not self.best_model.startswith("./"):
             self.best_model = "./" + self.best_model
@@ -174,18 +203,27 @@ class Trainning:
                     return True
                 elif received_data["action"] == "CONTINUE":
                     print("Continue training next round")
-                    self.current_round += 1
                     args = dict(model=self.last_model,
                                 data=dataset_path,
                                 epochs=epochs,
                                 batch=batch_size,
                                 project = f'./runs/detect/{self.client_id}',
                                 workers = worker,
-                                close_mosaic=0,
-                                save_period = valid_epoch_model)
+                                save_period = valid_epoch_model,
+                                optimizer='SGD',
+                                lr0=0.01 * (0.95 ** self.current_round),
+                                momentum=0.9)
                     trainer = TrainerClass(overrides=args, client_id=self.client_id, layer_id=self.layer_id, num_client=num_client,
                             cut_layer=cut_layer, address=address, username=username, password=password, load_partial_model=load_partial_model, FedAvg=True)
                     trainer.train()
+                    save_dir = trainer.save_dir
+                    results_csv = save_dir / "results.csv"
+                    self.current_round += 1
+                    src.Utils.log_results_csv_to_mlflow(
+                        results_csv=results_csv,
+                        round_id=self.current_round,
+                        epochs_per_round=epochs
+                    )
                     self.best_model = str(trainer.best)
                     if not self.best_model.startswith("./"):
                         self.best_model = "./" + self.best_model
@@ -193,7 +231,6 @@ class Trainning:
                     self.last_model = str(trainer.last)
                     if not self.last_model.startswith("./"):
                         self.last_model = "./" + self.last_model
-
                     notify_data = {"action": "NOTIFY", "client_id": self.client_id, "layer_id": self.layer_id,
                                     "message": "Finish round 2!", "round": self.current_round, "best": self.best_model, "last": self.last_model}
                     self.send_to_server(notify_data)
@@ -220,8 +257,8 @@ class Trainning:
             forward_queue_name = f'label_queue'
             self.channel.queue_declare(queue=forward_queue_name, durable=False)
             self.channel.basic_qos(prefetch_count=10)
-            
-            result = self.train_on_last_layer(model_path, dataset_path, num_client, cut_layer, num_round, task, epochs, batch_size, worker, address, username, password, load_partial_model, valid_epoch_model)
+            with mlflow.start_run(run_name=f"client_layer_{self.layer_id}"):
+                result = self.train_on_last_layer(model_path, dataset_path, num_client, cut_layer, num_round, task, epochs, batch_size, worker, address, username, password, load_partial_model, valid_epoch_model)
 
         if self.event_time:
             src.Log.print_with_color(f"Training time events {self.time_event}", "yellow")

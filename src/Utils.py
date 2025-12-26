@@ -4,6 +4,8 @@ import yaml
 import pika
 from pathlib import Path
 import shutil
+import re
+import mlflow
 
 IMG_FORMATS = {".bmp", ".dng", ".jpeg", ".jpg", ".mpo", ".png", ".tif", ".tiff", ".webp", ".pfm", ".heic"}  # image formats
 
@@ -27,6 +29,33 @@ def log_to_csv(csv_file, data_dict):
         """
         df = pd.DataFrame([data_dict])
         df.to_csv(csv_file, mode='a', header=not os.path.exists(csv_file), index=False)
+
+def sanitize_metric_name(name: str) -> str:
+    name = name.replace("(", "").replace(")", "")
+    name = re.sub(r"[^a-zA-Z0-9_\-./ ]", "_", name)
+    return name
+
+def log_results_csv_to_mlflow(
+    results_csv,
+    round_id,
+    epochs_per_round
+):
+    df = pd.read_csv(results_csv)
+
+    for _, row in df.iterrows():
+        epoch = int(row["epoch"])
+        global_step = (round_id-1) * epochs_per_round + epoch
+
+        for col in df.columns:
+            if col == "epoch":
+                continue
+
+            value = row[col]
+            if pd.isna(value):
+                continue
+
+            metric_name = sanitize_metric_name(col)
+            mlflow.log_metric(metric_name, float(value), step=global_step)
 
 def save_model_file(best_model, best_dir="./best_model_vm"):
         save_dir = os.path.abspath(best_dir)
