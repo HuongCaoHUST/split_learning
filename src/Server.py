@@ -13,6 +13,7 @@ import src.Log
 import src.Utils
 from src.Validation import ModelValidator
 from src.Utils import split_dataset, calculate_latency
+import mlflow
 
 def delete_old_queues(address, username, password):
     url = f'http://{address}:15672/api/queues'
@@ -44,13 +45,6 @@ def delete_old_queues(address, username, password):
                     src.Log.print_with_color(f"Queue '{queue_name}' deleted.", "green")
                 except Exception as e:
                     src.Log.print_with_color(f"Failed to delete queue '{queue_name}': {e}", "yellow")
-            # else:
-            #     try:
-            #         http_channel.queue_purge(queue=queue_name)
-            #         src.Log.print_with_color(f"Queue '{queue_name}' deleted.", "green")
-            #     except Exception as e:
-            #         src.Log.print_with_color(f"Failed to purge queue '{queue_name}': {e}", "yellow")
-
         connection.close()
         return True
     else:
@@ -129,13 +123,19 @@ class Server:
 
         self.channel.queue_declare(queue='Server_queue')
         self.channel.basic_qos(prefetch_count=1)
+
+        mlflow.set_tracking_uri("http://14.225.254.18:5000")
+        mlflow.set_experiment("Split_Learning")
+        mlflow.start_run(run_name=f"server")
         self.channel.basic_consume(queue='Server_queue', on_message_callback=self.on_request)
+
         self.logger = src.Log.Logger(f"{log_path}/app.log")
         filename = os.path.basename(config_dir)
         self.logger.log_info(f"Start Training - File config: {filename}")
         src.Utils.init_csv(f"{log_path}/log/log_validation.csv", headers=["epoch", "precision", "recall", "mAP50", "mAP50-95"])
 
         src.Log.print_with_color(f"Server is waiting for {self.total_clients} clients.", "green")
+        self.current_round = 0
         
 
     def connect(self):
@@ -207,13 +207,13 @@ class Server:
                         "message": "Continue training!",
                         "model_path": avg_model_path}
                     self.notify_to_all_clients(message)
+                    self.current_round +=1
                 else:
                     message = {"action": "PAUSE",
                         "message": "Pause training and please send your parameters",
                         "parameters": None}
                     src.Log.print_with_color(f"[>>>] Sent stop training request to client {client_id}", "red")
                     self.notify_to_all_clients(message)
-
 
         elif action == "VAL_INTER":
             src.Log.print_with_color(f"[<<<] Received message from client: {message}", "blue")
@@ -225,7 +225,13 @@ class Server:
             }
             if layer_id in layer_map:
                 layer_map[layer_id].append(message["epoch_intermediate"])
-         
+
+            if len(self.val_function.epoch_model_layer_1) == self.total_clients[0] and len(self.val_function.epoch_model_layer_2) == self.total_clients[1]:
+                epoch=message["epoch"]
+                self.val_function.validate_epoch_model(self.epochs*self.current_round + epoch)
+                self.val_function.epoch_model_layer_1 = []
+                self.val_function.epoch_model_layer_2 = []
+
         elif action == "UPDATE":
             client_id = message["client_id"]
             virtual_machine=message["vm"]
@@ -252,6 +258,7 @@ class Server:
                 # self.val_function.validate_epoch_model()
                 src.Utils.calculate_latency()
                 sys.exit()
+                mlflow.end_run()
 
         # Ack the message
         ch.basic_ack(delivery_tag=method.delivery_tag)

@@ -22,7 +22,7 @@ model:
     - 5
     - 5
   hybrid_training: False
-  valid_epoch_model: False
+  valid_epoch_model: True
   output_model: ./merged_model.pt
 
 dataset:

@@ -26,8 +26,6 @@ class Trainning:
         from ultralytics import settings
         
         settings.update({"mlflow": False})
-        mlflow.set_tracking_uri("http://14.225.254.18:5000")
-        mlflow.set_experiment("Split_Learning")
     
     def send_to_server(self, message):
         print (f"[>>>] Client {self.client_id} send message to server: {message}")

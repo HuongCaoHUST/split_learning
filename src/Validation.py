@@ -4,6 +4,7 @@ from ultralytics.models.yolo.classify import ClassificationValidator
 from ultralytics import YOLO
 import torch
 import src.Utils
+import mlflow
 
 class ModelValidator:
     def __init__(self, total_client, hybrid_training, cut_layer, best_model_layer_1, best_model_2, epoch_model_layer_1, epoch_model_layer_2, dataset_path, output_model):
@@ -25,27 +26,16 @@ class ModelValidator:
         print("metrics: ", metrics)
         return True
     
-    def validate_epoch_model(self):
-        epoch = 0
-        for val1, val2 in zip(self.epoch_model_layer_1, self.epoch_model_layer_2):
-            print("Epoch model layer 1: ", val1)
-            print("Epoch model layer 2: ", val2)
-            merge_model = self.merge_yolo_epoch_models(val1, val2)
-            args = dict(model=merge_model, data=self.dataset_path[0])
-            validator = DetectionValidator(args=args)
-            results = validator()
-            epoch += 1
-            print(f"Epoch {epoch}: precision={results['metrics/precision(B)']:.4f}, "
-                f"recall={results['metrics/recall(B)']:.4f}, "
-                f"mAP50={results['metrics/mAP50(B)']:.4f}, "
-                f"mAP50-95={results['metrics/mAP50-95(B)']:.4f}")
-            src.Utils.log_to_csv(f"./log/log_validation.csv", {
-                "epoch": epoch,
-                "precision": results['metrics/precision(B)'],
-                "recall": results['metrics/recall(B)'],
-                "mAP50": results['metrics/mAP50(B)'],
-                "mAP50-95": results['metrics/mAP50-95(B)']
-            })
+    def validate_epoch_model(self, epoch = None):
+        merge_model = self.merge_yolo_epoch_models(self.epoch_model_layer_1, self.epoch_model_layer_2)
+        args = dict(model=merge_model, data=self.dataset_path[0])
+        validator = DetectionValidator(args=args)
+        results = validator()
+        
+        epoch = epoch + 1
+        for k, v in results.items():
+            name = src.Utils.sanitize_metric_name(k)
+            mlflow.log_metric(name, float(v), step=epoch)
         return True
     
     def merge_yolo_models(self):
@@ -222,28 +212,38 @@ class ModelValidator:
         
     def merge_yolo_epoch_models(self, model1_path = None, model2_path = None):
         output_path = './merged_epoch_model.pt'
-        print("MERGE_EPOCH_MODEL")
-        model1 = YOLO(model1_path)
-        model2 = YOLO(model2_path)
+        num_models = len(model1_path)
+        models = []
+        sds = []
 
-        state_dict1 = model1.model.state_dict()
+        for i in range(num_models):
+            m = YOLO(model1_path[i])
+            models.append(m)
+            sds.append(m.model.state_dict())
+    
+        avg_sd = {}
+        for key in sds[0].keys():
+            avg_sd[key] = torch.zeros_like(sds[0][key])
+            for i in range(num_models):
+                avg_sd[key] += sds[i][key]
+            avg_sd[key] = avg_sd[key] / num_models
+
+        model2 = YOLO(model2_path[0])
         state_dict2 = model2.model.state_dict()
-
         new_state_dict = state_dict2.copy()
 
-        for k in state_dict1.keys():
+        for k in avg_sd.keys():
             if k.startswith("model."):
                 try:
                     layer_num = int(k.split('.')[1])
                     if layer_num <= self.cut_layer:
-                        new_state_dict[k] = state_dict1[k]
+                        new_state_dict[k] = avg_sd[k]
+                        print("LAYER num: ", layer_num)
                 except:
                     pass
 
         model2.model.load_state_dict(new_state_dict)
-
         model2.save(output_path)
-
         print(f"Đã ghép xong model và lưu tại: {output_path}")
         return output_path
     

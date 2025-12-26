@@ -19,6 +19,9 @@ class Client:
         self.virtual_machine = virtual_machine
         print(f"Client {self.client_id} initialized with layer {self.layer_id} on device {self.device}")
         self.connect()
+
+        mlflow.set_tracking_uri("http://14.225.254.18:5000")
+        mlflow.set_experiment("Split_Learning")
     
     def connect(self):
         credentials = pika.PlainCredentials(self.username, self.password)
