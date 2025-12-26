@@ -3,6 +3,7 @@ import pickle
 import pika
 import random
 from torch import nn
+import mlflow
 import src.Utils
 import src.Log
 
@@ -65,7 +66,8 @@ class Client:
             if self.layer_id == 1:
                 result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, num_round, task, epochs, batch_size, worker, self.address, self.username, self.password, load_partial_model, valid_epoch_model)
             if self.layer_id == 2:
-                result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, num_round, task, epochs, batch_size, worker, self.address, self.username, self.password, load_partial_model, valid_epoch_model)
+                with mlflow.start_run(run_name=f"client_layer_{self.layer_id}"):
+                    result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, num_round, task, epochs, batch_size, worker, self.address, self.username, self.password, load_partial_model, valid_epoch_model)
             
             if self.virtual_machine:
                 file_data = src.Utils.read_file(best)
