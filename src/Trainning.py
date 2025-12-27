@@ -49,6 +49,8 @@ class Trainning:
                     batch=batch_size,
                     project = f'./runs/detect/{self.client_id}',
                     workers = worker,
+                    optimizer='AdamW',
+                    lr0=0.001,
                     save_period = valid_epoch_model)
         trainer = TrainerClass(overrides=args, client_id=self.client_id,
                                          layer_id=self.layer_id, num_client=num_client,
@@ -66,7 +68,6 @@ class Trainning:
                            "message": "Finish round 1!", "round": self.current_round, "best": self.best_model, "last": self.last_model}
         # Finish epoch training, send notify to server
         self.send_to_server(notify_data)
-        # src.Log.print_with_color("[>>>] Finish training!", "red")
 
         broadcast_queue_name = f'reply_{self.client_id}'
         while True:  # Wait for broadcast
@@ -81,26 +82,6 @@ class Trainning:
                     print("Continue training next round")
                     print("Fed avg model path:", received_data["model_path"])
                     fed_model_path = received_data["model_path"]
-                    # trainer_last = trainer.last
-
-                    # fed_ckpt = torch.load(fed_model_path, map_location='cpu')
-                    # if isinstance(fed_ckpt, dict) and 'model' in fed_ckpt:
-                    #     fed_sd = fed_ckpt['model'].state_dict()
-                    # else:
-                    #     fed_sd = fed_ckpt.state_dict() if hasattr(fed_ckpt, 'state_dict') else fed_ckpt
-
-                    # last_model = YOLO(trainer_last)
-                    # last_sd = last_model.model.state_dict()
-
-                    # filtered_sd = {k: v for k, v in fed_sd.items() if k in last_sd and v.shape == last_sd[k].shape}
-
-                    # print(f"Loaded {len(filtered_sd)}/{len(fed_sd)} weights (skipped mismatched keys like head).")
-
-                    # last_model.model.load_state_dict(filtered_sd, strict=False)
-
-                    # last_model.save(trainer_last)
-
-                    # print(f"Saved to: {trainer_last}")
 
                     args = dict(model=model_path,
                                 data=dataset_path,
@@ -109,6 +90,8 @@ class Trainning:
                                 batch=batch_size,
                                 project = f'./runs/detect/{self.client_id}',
                                 workers = worker,
+                                optimizer='AdamW',
+                                lr0=0.001 * (0.95 ** self.current_round),
                                 save_period = valid_epoch_model)
                     trainer = TrainerClass(overrides=args, client_id=self.client_id, layer_id=self.layer_id, num_client=num_client,
                             cut_layer=cut_layer, address=address, username=username, password=password, load_partial_model=load_partial_model, FedAvg=True)
@@ -209,8 +192,7 @@ class Trainning:
                                 workers = worker,
                                 save_period = valid_epoch_model,
                                 optimizer='SGD',
-                                lr0=0.01 * (0.95 ** self.current_round),
-                                momentum=0.9)
+                                lr0=0.01 * (0.95 ** self.current_round))
                     trainer = TrainerClass(overrides=args, client_id=self.client_id, layer_id=self.layer_id, num_client=num_client,
                             cut_layer=cut_layer, address=address, username=username, password=password, load_partial_model=load_partial_model, FedAvg=True)
                     trainer.train()

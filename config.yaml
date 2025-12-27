@@ -2,7 +2,7 @@ name: Split Learning
 server:
   num-round: 2
   clients:
-    - 2
+    - 4
     - 1
 
 rabbit:
@@ -18,7 +18,11 @@ model:
   model_path_partial:
     - ./yolo11n_custom.yaml
     - ./yolo11n_custom.yaml
+    - ./yolo11n_custom.yaml
+    - ./yolo11n_custom.yaml
   cut_layer: 
+    - 5
+    - 5
     - 5
     - 5
   hybrid_training: False
@@ -27,6 +31,8 @@ model:
 
 dataset:
   dataset_path:
+    - ./coco8.yaml
+    - ./coco8.yaml
     - ./coco8.yaml
     - ./coco8.yaml
   concatenate_datasets: False
