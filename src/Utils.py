@@ -174,3 +174,44 @@ def calculate_latency():
     latency_df = pd.DataFrame(latencies)
     latency_df.to_csv("./log/latency_results.csv", index=False)
     print("Log latency to log/latency_results.csv")
+
+def create_yaml_model(original_file, new_file, cut_layer):
+    """
+    Generate YAML file for model Yolo11
+    """
+    with open(original_file, 'r', encoding='utf-8') as f:
+        lines = f.readlines()
+
+    out_lines = []
+    section = None
+    layer_idx = -1
+    writing_section = True
+
+    for line in lines:
+        stripped = line.strip()
+
+        if stripped.startswith('backbone:') or stripped.startswith('head:'):
+            section = stripped[:-1]
+            if layer_idx >= cut_layer:
+                writing_section = False
+            else:
+                writing_section = True
+                out_lines.append(line)
+            continue
+        elif stripped == '':
+            if writing_section:
+                out_lines.append(line)
+            continue
+
+        if stripped.startswith('- '):
+            layer_idx += 1
+            if layer_idx > cut_layer:
+                writing_section = False
+
+        if writing_section:
+            out_lines.append(line)
+
+    with open(new_file, 'w', encoding='utf-8') as f:
+        f.writelines(out_lines)
+
+    return new_file
