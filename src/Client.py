@@ -5,6 +5,7 @@ import random
 from torch import nn
 import src.Utils
 import src.Log
+import mlflow
 
 class Client:
     def __init__(self, client_id, layer_id, address, username, password, train_func, device, virtual_machine=False):
@@ -18,6 +19,9 @@ class Client:
         self.virtual_machine = virtual_machine
         print(f"Client {self.client_id} initialized with layer {self.layer_id} on device {self.device}")
         self.connect()
+
+        mlflow.set_tracking_uri("http://14.225.254.18:5000")
+        mlflow.set_experiment("Split_Learning")
     
     def connect(self):
         credentials = pika.PlainCredentials(self.username, self.password)
@@ -65,7 +69,8 @@ class Client:
             if self.layer_id == 1:
                 result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, num_round, task, epochs, batch_size, worker, self.address, self.username, self.password, load_partial_model, valid_epoch_model)
             if self.layer_id == 2:
-                result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, num_round, task, epochs, batch_size, worker, self.address, self.username, self.password, load_partial_model, valid_epoch_model)
+                with mlflow.start_run(run_name=f"client_layer_{self.layer_id}"):
+                    result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, num_round, task, epochs, batch_size, worker, self.address, self.username, self.password, load_partial_model, valid_epoch_model)
             
             if self.virtual_machine:
                 file_data = src.Utils.read_file(best)

@@ -4,6 +4,8 @@ import yaml
 import pika
 from pathlib import Path
 import shutil
+import re
+import mlflow
 
 IMG_FORMATS = {".bmp", ".dng", ".jpeg", ".jpg", ".mpo", ".png", ".tif", ".tiff", ".webp", ".pfm", ".heic"}  # image formats
 
@@ -215,3 +217,27 @@ def create_yaml_model(original_file, new_file, cut_layer):
         f.writelines(out_lines)
 
     return new_file
+
+def sanitize_metric_name(name: str) -> str:
+    name = name.replace("(", "").replace(")", "")
+    name = re.sub(r"[^a-zA-Z0-9_\-./ ]", "_", name)
+    return name
+
+def log_results_csv_to_mlflow(
+    results_csv
+):
+    df = pd.read_csv(results_csv)
+
+    for _, row in df.iterrows():
+        epoch = int(row["epoch"])
+
+        for col in df.columns:
+            if col == "epoch":
+                continue
+
+            value = row[col]
+            if pd.isna(value):
+                continue
+
+            metric_name = sanitize_metric_name(col)
+            mlflow.log_metric(metric_name, float(value), step=epoch)

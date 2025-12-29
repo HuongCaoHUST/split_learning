@@ -7,6 +7,8 @@ import src.Log
 from ultralytics import YOLO
 import torch
 from src.Utils import create_yaml_model
+from ultralytics import settings
+import mlflow
 
 class Trainning:
     def __init__(self, client_id, layer_id, channel, device, event_time=False):
@@ -20,6 +22,8 @@ class Trainning:
         self.time_event = []
         self.best_model = None
         self.current_round = 1
+        
+        settings.update({"mlflow": False})
     
 
     def send_to_server(self, message):
@@ -121,9 +125,7 @@ class Trainning:
             time.sleep(0.5)
 
     def train_on_last_layer(self, model_path, dataset_path, num_client, cut_layer, num_round, task, epochs, batch_size, worker, address = None, username = None, password = None, load_partial_model=False, valid_epoch_model = -1):
-        queue_name = f'label_queue'
-        result = True
-        self.channel.queue_declare(queue=queue_name, durable=False)
+        self.channel.queue_declare(queue='label_queue', durable=False)
         self.channel.queue_declare(queue="number_batch_queue", durable=False)
         self.channel.basic_qos(prefetch_count=10)
         print('Waiting for intermediate output. To exit press CTRL+C')
@@ -142,13 +144,35 @@ class Trainning:
                     batch=batch_size,
                     project = './runs/detect',
                     workers = worker,
-                    save_period = valid_epoch_model
-                    # optimizer='AdamW',
+                    save_period = valid_epoch_model,
+                    optimizer='SGD'
                     )
+        
+        mlflow.log_params({
+            "task": task,
+            "client_id": self.client_id,
+            "layer_id": self.layer_id,
+            "num_client": num_client,
+            "cut_layer": cut_layer,
+            "epochs": epochs,
+            "batch_size": batch_size,
+            "workers": worker,
+            "pretrained": "./yolo11n.pt",
+            "dataset": dataset_path
+        })
+
         trainer = TrainerClass(overrides=args, client_id=self.client_id,
                                          layer_id=self.layer_id, num_client=num_client,
                                          cut_layer=cut_layer, address=address, username=username, password=password, load_partial_model=load_partial_model)
         trainer.train()
+
+        # Log to ML FLow
+        save_dir = trainer.save_dir
+        results_csv = save_dir / "results.csv"
+        src.Utils.log_results_csv_to_mlflow(
+            results_csv=results_csv
+        )
+
         self.best_model = str(trainer.best)
         if not self.best_model.startswith("./"):
             self.best_model = "./" + self.best_model
@@ -182,10 +206,19 @@ class Trainning:
                                 project = f'./runs/detect/{self.client_id}',
                                 workers = worker,
                                 close_mosaic=0,
-                                save_period = valid_epoch_model)
+                                save_period = valid_epoch_model,
+                                optimizer='SGD')
                     trainer = TrainerClass(overrides=args, client_id=self.client_id, layer_id=self.layer_id, num_client=num_client,
                             cut_layer=cut_layer, address=address, username=username, password=password, load_partial_model=load_partial_model, FedAvg=True)
                     trainer.train()
+
+                    # Log to ML FLow
+                    save_dir = trainer.save_dir
+                    results_csv = save_dir / "results.csv"
+                    src.Utils.log_results_csv_to_mlflow(
+                        results_csv=results_csv
+                    )
+
                     self.best_model = str(trainer.best)
                     if not self.best_model.startswith("./"):
                         self.best_model = "./" + self.best_model
