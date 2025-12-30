@@ -35,7 +35,7 @@ class Trainning:
     def train_on_first_layer(self, model_path, dataset_path, num_client, cut_layer, num_round, task, epochs, batch_size, worker, address = None, username = None, password = None, load_partial_model=False, valid_epoch_model = -1):
         src.Log.print_with_color(f"--- START TRAINING FIRST LAYER --- CURREN ROUND: {self.current_round} ---", "green")
 
-        yaml_model = create_yaml_model('yolo11n.yaml', 'yolo11n_custom.yaml', cut_layer=5)
+        yaml_model = create_yaml_model('yolo11n.yaml', 'yolo11n_custom.yaml', cut_layer=cut_layer)
         TRAINER = {
             "detect": Split_Learning_DetectionTrainer,
             "segment": Split_Learning_SegmentationTrainer,
