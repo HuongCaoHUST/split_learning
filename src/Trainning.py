@@ -104,10 +104,13 @@ class Trainning:
 
                     args = dict(model=fed_model_path,
                                 epochs=epochs,
+                                data=dataset_path,
                                 batch=batch_size,
                                 project = f'./runs/detect/{self.client_id}',
                                 workers = worker,
-                                save_period = valid_epoch_model)
+                                save_period = valid_epoch_model,
+                                lr0=0.001 * (0.92 ** (self.current_round-1)),
+                                warmup_epochs=0)
                     trainer = TrainerClass(overrides=args, client_id=self.client_id, layer_id=self.layer_id, num_client=num_client,
                             cut_layer=cut_layer, address=address, username=username, password=password, load_partial_model=load_partial_model, FedAvg=True)
                     trainer.train()
@@ -168,9 +171,7 @@ class Trainning:
         # Log to ML FLow
         save_dir = trainer.save_dir
         results_csv = save_dir / "results.csv"
-        src.Utils.log_results_csv_to_mlflow(
-            results_csv=results_csv
-        )
+        src.Utils.log_results_csv_to_mlflow(results_csv=results_csv, round = self.current_round, epoch_per_round = epochs)
 
         self.best_model = str(trainer.best)
         if not self.best_model.startswith("./"):
@@ -206,7 +207,9 @@ class Trainning:
                                 workers = worker,
                                 close_mosaic=0,
                                 save_period = valid_epoch_model,
-                                optimizer='SGD')
+                                optimizer='SGD',
+                                lr0=0.01 * (0.92 ** (self.current_round-1)),
+                                warmup_epochs=0)
                     trainer = TrainerClass(overrides=args, client_id=self.client_id, layer_id=self.layer_id, num_client=num_client,
                             cut_layer=cut_layer, address=address, username=username, password=password, load_partial_model=load_partial_model, FedAvg=True)
                     trainer.train()
@@ -214,9 +217,7 @@ class Trainning:
                     # Log to ML FLow
                     save_dir = trainer.save_dir
                     results_csv = save_dir / "results.csv"
-                    src.Utils.log_results_csv_to_mlflow(
-                        results_csv=results_csv
-                    )
+                    src.Utils.log_results_csv_to_mlflow(results_csv=results_csv, round = self.current_round, epoch_per_round = epochs)
 
                     self.best_model = str(trainer.best)
                     if not self.best_model.startswith("./"):

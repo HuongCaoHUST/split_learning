@@ -224,20 +224,35 @@ def sanitize_metric_name(name: str) -> str:
     return name
 
 def log_results_csv_to_mlflow(
-    results_csv
+    results_csv, round, epoch_per_round
 ):
     df = pd.read_csv(results_csv)
 
-    for _, row in df.iterrows():
-        epoch = int(row["epoch"])
+    if round > 1:
+        for _, row in df.iterrows():
+            epoch = int(row["epoch"])
+            global_step = (round-1) * epoch_per_round + epoch
+            for col in df.columns:
+                if col == "epoch":
+                    continue
 
-        for col in df.columns:
-            if col == "epoch":
-                continue
+                value = row[col]
+                if pd.isna(value):
+                    continue
 
-            value = row[col]
-            if pd.isna(value):
-                continue
+                metric_name = sanitize_metric_name(col)
+                mlflow.log_metric(metric_name, float(value), step=global_step)
+    else:
+        for _, row in df.iterrows():
+            epoch = int(row["epoch"])
 
-            metric_name = sanitize_metric_name(col)
-            mlflow.log_metric(metric_name, float(value), step=epoch)
+            for col in df.columns:
+                if col == "epoch":
+                    continue
+
+                value = row[col]
+                if pd.isna(value):
+                    continue
+
+                metric_name = sanitize_metric_name(col)
+                mlflow.log_metric(metric_name, float(value), step=epoch)
