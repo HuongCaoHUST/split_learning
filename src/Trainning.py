@@ -81,29 +81,29 @@ class Trainning:
                     print("Continue training next round")
                     print("Fed avg model path:", received_data["model_path"])
                     fed_model_path = received_data["model_path"]
-                    trainer_last = trainer.last
+                    # trainer_last = trainer.last
 
-                    fed_ckpt = torch.load(fed_model_path, map_location='cpu')
-                    if isinstance(fed_ckpt, dict) and 'model' in fed_ckpt:
-                        fed_sd = fed_ckpt['model'].state_dict()
-                    else:
-                        fed_sd = fed_ckpt.state_dict() if hasattr(fed_ckpt, 'state_dict') else fed_ckpt
+                    # fed_ckpt = torch.load(fed_model_path, map_location='cpu')
+                    # if isinstance(fed_ckpt, dict) and 'model' in fed_ckpt:
+                    #     fed_sd = fed_ckpt['model'].state_dict()
+                    # else:
+                    #     fed_sd = fed_ckpt.state_dict() if hasattr(fed_ckpt, 'state_dict') else fed_ckpt
 
-                    last_model = YOLO(trainer_last)
-                    last_sd = last_model.model.state_dict()
+                    # last_model = YOLO(trainer_last)
+                    # last_sd = last_model.model.state_dict()
 
-                    filtered_sd = {k: v for k, v in fed_sd.items() if k in last_sd and v.shape == last_sd[k].shape}
+                    # filtered_sd = {k: v for k, v in fed_sd.items() if k in last_sd and v.shape == last_sd[k].shape}
 
-                    print(f"Loaded {len(filtered_sd)}/{len(fed_sd)} weights (skipped mismatched keys like head).")
+                    # print(f"Loaded {len(filtered_sd)}/{len(fed_sd)} weights (skipped mismatched keys like head).")
 
-                    last_model.model.load_state_dict(filtered_sd, strict=False)
+                    # last_model.model.load_state_dict(filtered_sd, strict=False)
 
-                    last_model.save(trainer_last)
+                    # last_model.save(trainer_last)
 
-                    print(f"Saved to: {trainer_last}")
+                    # print(f"Saved to: {trainer_last}")
 
-                    args = dict(resume=trainer_last,
-                                epochs=self.current_round*epochs,
+                    args = dict(model=fed_model_path,
+                                epochs=epochs,
                                 batch=batch_size,
                                 project = f'./runs/detect/{self.client_id}',
                                 workers = worker,
@@ -145,8 +145,7 @@ class Trainning:
                     project = './runs/detect',
                     workers = worker,
                     save_period = valid_epoch_model,
-                    optimizer='SGD'
-                    )
+                    optimizer='SGD')
         
         mlflow.log_params({
             "task": task,
@@ -199,9 +198,9 @@ class Trainning:
                 elif received_data["action"] == "CONTINUE":
                     print("Continue training next round")
                     self.current_round += 1
-                    args = dict(resume=self.last_model,
+                    args = dict(model=self.last_model,
                                 data=dataset_path,
-                                epochs=self.current_round*epochs,
+                                epochs=epochs,
                                 batch=batch_size,
                                 project = f'./runs/detect/{self.client_id}',
                                 workers = worker,
