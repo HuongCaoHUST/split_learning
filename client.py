@@ -8,6 +8,9 @@ import time
 import src.Log
 from src.Client import Client
 from src.Trainning import Trainning
+import threading
+import psutil
+import requests
 
 
 parser = argparse.ArgumentParser(description="Split learning framework")
@@ -59,11 +62,39 @@ def connection(username, password, address):
         except pika.exceptions.AMQPConnectionError as e:
             time.sleep(1)
 
+PUSHGATEWAY = "http://14.225.254.18:9091/metrics/job/pi_metrics/instance/pi1"
+def push_metrics_loop():
+    while True:
+        try:
+            cpu = psutil.cpu_percent() / 100
+            ram_used = psutil.virtual_memory().used / (1024 * 1024)
+            disk = psutil.disk_usage('/').percent / 100
+
+            data = f"""
+            # HELP pi_cpu_usage CPU usage
+            # TYPE pi_cpu_usage gauge
+            pi_cpu_usage {cpu}
+            # HELP pi_ram_usage RAM usage
+            # TYPE pi_ram_usage gauge
+            pi_ram_usage {ram_used}
+            # HELP pi_disk_usage Disk usage
+            # TYPE pi_disk_usage gauge
+            pi_disk_usage {disk}
+            """
+            requests.post(PUSHGATEWAY, data=data)
+        except Exception as e:
+            print("Failed to push metrics:", e)
+        time.sleep(10)
+
 if __name__ == "__main__":
     src.Log.print_with_color("[>>>] Client sending registration message to server...", "red")
     data = {"action": "REGISTER", "client_id": client_id, "layer_id": args.layer_id, "docker": args.docker, "virtual machine": args.vm}
     connection = connection(username, password, address)
     channel = connection.channel()
+    
+    metrics_thread = threading.Thread(target=push_metrics_loop, daemon=True)
+    metrics_thread.start()
+
     trainning = Trainning(client_id, args.layer_id, channel, device, args.event_time)
     client = Client(client_id, args.layer_id, address, username, password, trainning.train_on_device, device, args.vm)
     client.send_to_server(data)
