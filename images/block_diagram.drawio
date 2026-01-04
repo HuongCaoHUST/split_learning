@@ -1,0 +1,70 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.0.3 Chrome/140.0.7339.249 Electron/38.7.0 Safari/537.36" version="29.0.3">
+  <diagram name="Page-1" id="oc-q6zrcMz8EAxdjnygZ">
+    <mxGraphModel dx="679" dy="400" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="PQL9eA_ud0VFS_toxO9Q-3" value="&lt;div style=&quot;line-height: 125%;&quot;&gt;&lt;font data-font-src=&quot;https://fonts.googleapis.com/css?family=Montserrat&quot; style=&quot;font-family: Inter; font-size: 13px; line-height: 125%; color: rgb(46, 46, 48);&quot;&gt;Khối&lt;/font&gt;&lt;div style=&quot;font-family: Inter;&quot;&gt;&lt;font data-font-src=&quot;https://fonts.googleapis.com/css?family=Montserrat&quot; style=&quot;font-size: 13px; line-height: 125%; color: rgb(46, 46, 48);&quot;&gt;huấn luyện phần đầu&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;font-family: Inter;&quot;&gt;&lt;font data-font-src=&quot;https://fonts.googleapis.com/css?family=Montserrat&quot; style=&quot;font-size: 13px; line-height: 125%; color: rgb(46, 46, 48);&quot;&gt;mô hình&lt;/font&gt;&lt;/div&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#29C4F8;strokeColor=none;arcSize=5;fontStyle=0;opacity=30;" parent="1" vertex="1">
+          <mxGeometry x="80" y="210" width="140" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="PQL9eA_ud0VFS_toxO9Q-4" value="&lt;div style=&quot;line-height: 125%;&quot;&gt;&lt;font data-font-src=&quot;https://fonts.googleapis.com/css?family=Montserrat&quot; style=&quot;font-family: Inter; font-size: 13px; line-height: 125%; color: rgb(46, 46, 48);&quot;&gt;Khối&lt;/font&gt;&lt;div style=&quot;font-family: Inter;&quot;&gt;&lt;font data-font-src=&quot;https://fonts.googleapis.com/css?family=Montserrat&quot; style=&quot;font-size: 13px; line-height: 125%; color: rgb(46, 46, 48);&quot;&gt;huấn luyện phần sau&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;font-family: Inter;&quot;&gt;&lt;font data-font-src=&quot;https://fonts.googleapis.com/css?family=Montserrat&quot; style=&quot;font-size: 13px; line-height: 125%; color: rgb(46, 46, 48);&quot;&gt;mô hình&lt;/font&gt;&lt;/div&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#29C4F8;strokeColor=none;arcSize=5;fontStyle=0;opacity=30;" parent="1" vertex="1">
+          <mxGeometry x="440" y="210" width="140" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="PQL9eA_ud0VFS_toxO9Q-5" value="&lt;div style=&quot;line-height: 125%;&quot;&gt;&lt;font data-font-src=&quot;https://fonts.googleapis.com/css?family=Montserrat&quot; style=&quot;font-family: Inter; font-size: 13px; line-height: 125%; color: rgb(46, 46, 48);&quot;&gt;Khối&lt;/font&gt;&lt;div style=&quot;font-family: Inter;&quot;&gt;&lt;span style=&quot;font-size: 13px;&quot;&gt;&lt;font style=&quot;color: rgb(46, 46, 48);&quot;&gt;truyền thông&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#29C4F8;strokeColor=none;arcSize=5;fontStyle=0;opacity=30;" parent="1" vertex="1">
+          <mxGeometry x="260" y="210" width="140" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="PQL9eA_ud0VFS_toxO9Q-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontStyle=0;endArrow=blockThin;endFill=1;strokeColor=#2E2E30;" parent="1" source="PQL9eA_ud0VFS_toxO9Q-6" target="PQL9eA_ud0VFS_toxO9Q-3" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="330" y="170" />
+              <mxPoint x="150" y="170" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="PQL9eA_ud0VFS_toxO9Q-8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontStyle=0;endArrow=blockThin;endFill=1;strokeColor=#2E2E30;" parent="1" source="PQL9eA_ud0VFS_toxO9Q-6" target="PQL9eA_ud0VFS_toxO9Q-5" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="330" y="160" />
+              <mxPoint x="330" y="160" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="PQL9eA_ud0VFS_toxO9Q-9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontStyle=0;endArrow=blockThin;endFill=1;strokeColor=#2E2E30;" parent="1" source="PQL9eA_ud0VFS_toxO9Q-6" target="PQL9eA_ud0VFS_toxO9Q-4" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="330" y="170" />
+              <mxPoint x="510" y="170" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="PQL9eA_ud0VFS_toxO9Q-6" value="&lt;div style=&quot;line-height: 125%;&quot;&gt;&lt;font data-font-src=&quot;https://fonts.googleapis.com/css?family=Montserrat&quot; style=&quot;font-family: Inter; font-size: 13px; line-height: 125%; color: rgb(46, 46, 48);&quot;&gt;Khối&lt;/font&gt;&lt;div style=&quot;font-family: Inter;&quot;&gt;&lt;span style=&quot;font-size: 13px;&quot;&gt;&lt;font style=&quot;color: rgb(46, 46, 48);&quot;&gt;điều khiển trung tâm&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8B1B1;strokeColor=none;arcSize=5;fontStyle=0;opacity=30;" parent="1" vertex="1">
+          <mxGeometry x="240" y="80" width="180" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="_luFZcy-YcgUTZc5gAcT-1" value="" style="endArrow=blockThin;html=1;rounded=0;endFill=1;strokeColor=#2E2E30;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="220" y="234.86" as="sourcePoint" />
+            <mxPoint x="260" y="234.86" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="_luFZcy-YcgUTZc5gAcT-2" value="" style="endArrow=blockThin;html=1;rounded=0;endFill=1;strokeColor=#2E2E30;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="260" y="254.86" as="sourcePoint" />
+            <mxPoint x="220" y="254.86" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="_luFZcy-YcgUTZc5gAcT-3" value="" style="endArrow=blockThin;html=1;rounded=0;endFill=1;strokeColor=#2E2E30;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="400" y="230" as="sourcePoint" />
+            <mxPoint x="440" y="230" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="_luFZcy-YcgUTZc5gAcT-4" value="" style="endArrow=blockThin;html=1;rounded=0;endFill=1;strokeColor=#2E2E30;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="440" y="250" as="sourcePoint" />
+            <mxPoint x="400" y="250" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
