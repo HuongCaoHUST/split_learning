@@ -62,7 +62,7 @@ def connection(username, password, address):
         except pika.exceptions.AMQPConnectionError as e:
             time.sleep(1)
 
-PUSHGATEWAY = "http://14.225.254.18:9091/metrics/job/pi_metrics/instance/pi1"
+PUSHGATEWAY = f"http://14.225.254.18:9091/metrics/job/pi_metrics/instance/{client_id}"
 def push_metrics_loop():
     while True:
         try:
