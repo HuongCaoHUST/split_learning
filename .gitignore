@@ -166,6 +166,7 @@ cython_debug/
 /datasets/*
 !/datasets/mnitst_split_dataset.py
 !/datasets/new_spit_dataset.py
+!/datasets/split_coco_datasets.py
 /runs
 .idea
 *.pt
