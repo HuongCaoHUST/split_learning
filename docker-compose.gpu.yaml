@@ -10,16 +10,7 @@ services:
               count: 1
               capabilities: [gpu]
 
-  client_1_1:
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-
-  client_1_2:
+  client_1:
     deploy:
       resources:
         reservations:
