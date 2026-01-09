@@ -86,24 +86,6 @@ def push_metrics_loop():
             print("Failed to push metrics:", e)
         time.sleep(10)
 
-def register_node_http(client_id, host="14.225.254.18", port=8000):
-    """
-    Hàm đăng ký node qua API HTTP.
-    """
-    url = f"http://{host}:{port}/register"
-    payload = {
-        "action": "REGISTER",
-        "client_id": str(client_id)
-    }
-    try:
-        response = requests.post(url, json=payload)
-        if response.status_code == 200:
-            src.Log.print_with_color(f"API Register success: {response.json()}", "green")
-        else:
-            src.Log.print_with_color(f"API Register failed: {response.status_code} {response.text}", "red")
-    except Exception as e:
-        src.Log.print_with_color(f"API Register error: {e}", "red")
-
 if __name__ == "__main__":
     src.Log.print_with_color("[>>>] Client sending registration message to server...", "red")
     data = {"action": "REGISTER", "client_id": client_id, "layer_id": args.layer_id, "docker": args.docker, "virtual machine": args.vm}
@@ -112,8 +94,6 @@ if __name__ == "__main__":
     
     metrics_thread = threading.Thread(target=push_metrics_loop, daemon=True)
     metrics_thread.start()
-
-    register_node_http(client_id)
 
     trainning = Trainning(client_id, args.layer_id, channel, device, args.event_time)
     client = Client(client_id, args.layer_id, address, username, password, trainning.train_on_device, device, args.vm)

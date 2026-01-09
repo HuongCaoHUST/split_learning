@@ -13,6 +13,7 @@ import src.Log
 import src.Utils
 from src.Validation import ModelValidator
 from src.Utils import split_dataset, calculate_latency
+import mlflow
 
 def delete_old_queues(address, username, password):
     url = f'http://{address}:15672/api/queues'
@@ -44,12 +45,6 @@ def delete_old_queues(address, username, password):
                     src.Log.print_with_color(f"Queue '{queue_name}' deleted.", "green")
                 except Exception as e:
                     src.Log.print_with_color(f"Failed to delete queue '{queue_name}': {e}", "yellow")
-            # else:
-            #     try:
-            #         http_channel.queue_purge(queue=queue_name)
-            #         src.Log.print_with_color(f"Queue '{queue_name}' deleted.", "green")
-            #     except Exception as e:
-            #         src.Log.print_with_color(f"Failed to purge queue '{queue_name}': {e}", "yellow")
 
         connection.close()
         return True
@@ -136,6 +131,10 @@ class Server:
         src.Utils.init_csv(f"{log_path}/log/log_validation.csv", headers=["epoch", "precision", "recall", "mAP50", "mAP50-95"])
 
         src.Log.print_with_color(f"Server is waiting for {self.total_clients} clients.", "green")
+
+        # MLflow setup
+        mlflow.set_tracking_uri("http://14.225.254.18:5000")
+        mlflow.set_experiment("Split_Learning")
         
 
     def connect(self):
@@ -180,7 +179,8 @@ class Server:
             docker = message["docker"]
             if self.register_clients == self.total_clients:
                 src.Log.print_with_color("All clients are connected. Sending notifications.", "green")
-                self.notify_to_clients()
+                self.active_run = mlflow.start_run(run_name="Split Trainging")
+                self.notify_to_clients(run_id=self.active_run.info.run_id)
 
         elif action == "NOTIFY":
             src.Log.print_with_color(f"[<<<] Received message from client 1: {message}", "blue")
@@ -250,13 +250,14 @@ class Server:
                 #     self.val_function.validate_best_model()
 
                 # self.val_function.validate_epoch_model()
+                mlflow.end_run()
                 src.Utils.calculate_latency()
                 sys.exit()
 
         # Ack the message
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
-    def notify_to_clients(self, status="start", register=True):
+    def notify_to_clients(self, status="start", register=True, run_id=None):
 
         src.Log.print_with_color(f"notify_client", "red")
         print("self.list_client: ", self.list_clients)
@@ -277,7 +278,8 @@ class Server:
                             "momentum": self.momentum,
                             "worker": self.worker,
                             "load_partial_model": self.load_partial_model,
-                            "valid_epoch_model": self.valid_epoch_model}
+                            "valid_epoch_model": self.valid_epoch_model,
+                            "run_id": run_id}
                 
                 if layer_id == 1:
                     response["model_path"] = self.model_path[0]

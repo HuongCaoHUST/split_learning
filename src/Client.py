@@ -2,6 +2,8 @@ import time
 import pickle
 import pika
 import random
+
+import requests
 from torch import nn
 import src.Utils
 import src.Log
@@ -63,13 +65,14 @@ class Client:
         worker = self.response.get("worker")
         load_partial_model = self.response.get("load_partial_model")
         valid_epoch_model = self.response.get("valid_epoch_model")
-
+        run_id = self.response.get("run_id")
         if action == "START":
             src.Log.print_with_color(f"[<<<] Client received: {self.response}", "blue")
+            self.register_node_http(self.client_id, run_id=run_id)
             if self.layer_id == 1:
                 result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, num_round, task, epochs, batch_size, worker, self.address, self.username, self.password, load_partial_model, valid_epoch_model)
             if self.layer_id == 2:
-                with mlflow.start_run(run_name=f"client_layer_{self.layer_id}"):
+                with mlflow.start_run(run_id=run_id):
                     result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, num_round, task, epochs, batch_size, worker, self.address, self.username, self.password, load_partial_model, valid_epoch_model)
             
             if self.virtual_machine:
@@ -87,3 +90,22 @@ class Client:
         elif action == "STOP":
             print("Training completed. Client stopping.")
             return False
+
+    def register_node_http(self, client_id, run_id, host="14.225.254.18", port=8000):
+        """
+        Hàm đăng ký node qua API HTTP.
+        """
+        url = f"http://{host}:{port}/register"
+        payload = {
+            "action": "REGISTER",
+            "client_id": str(client_id),
+            "run_id": str(run_id)
+        }
+        try:
+            response = requests.post(url, json=payload)
+            if response.status_code == 200:
+                src.Log.print_with_color(f"API Register success: {response.json()}", "green")
+            else:
+                src.Log.print_with_color(f"API Register failed: {response.status_code} {response.text}", "red")
+        except Exception as e:
+            src.Log.print_with_color(f"API Register error: {e}", "red")
