@@ -2,7 +2,7 @@ import time
 import pickle
 import pika
 from tqdm import tqdm
-from engine.train import Split_Learning_DetectionTrainer, Split_Learning_SegmentationTrainer, Split_Learning_ClassificationTrainer
+from split_learning.models.yolo.detect.train_edge_side import Split_Learning_DetectionTrainer
 import src.Log
 from ultralytics import YOLO
 import torch
@@ -10,7 +10,7 @@ from src.Utils import create_yaml_model
 from ultralytics import settings
 import mlflow
 
-class Trainning:
+class Training:
     def __init__(self, client_id, layer_id, channel, device, event_time=False):
         self.client_id = client_id
         self.layer_id = layer_id
@@ -37,12 +37,10 @@ class Trainning:
 
         yaml_model = create_yaml_model('yolo11n.yaml', 'yolo11n_custom.yaml', cut_layer=cut_layer)
         TRAINER = {
-            "detect": Split_Learning_DetectionTrainer,
-            "segment": Split_Learning_SegmentationTrainer,
-            "classify": Split_Learning_ClassificationTrainer,
+            "detect": Split_Learning_DetectionTrainer
         }
         TrainerClass = TRAINER.get(task)
-        args = dict(model=model_path,
+        args = dict(model="yolo11n.yaml",
                     data=dataset_path,
                     pretrained="./yolo11n.pt",
                     epochs=epochs,
@@ -81,27 +79,6 @@ class Trainning:
                     print("Continue training next round")
                     print("Fed avg model path:", received_data["model_path"])
                     fed_model_path = received_data["model_path"]
-                    # trainer_last = trainer.last
-
-                    # fed_ckpt = torch.load(fed_model_path, map_location='cpu')
-                    # if isinstance(fed_ckpt, dict) and 'model' in fed_ckpt:
-                    #     fed_sd = fed_ckpt['model'].state_dict()
-                    # else:
-                    #     fed_sd = fed_ckpt.state_dict() if hasattr(fed_ckpt, 'state_dict') else fed_ckpt
-
-                    # last_model = YOLO(trainer_last)
-                    # last_sd = last_model.model.state_dict()
-
-                    # filtered_sd = {k: v for k, v in fed_sd.items() if k in last_sd and v.shape == last_sd[k].shape}
-
-                    # print(f"Loaded {len(filtered_sd)}/{len(fed_sd)} weights (skipped mismatched keys like head).")
-
-                    # last_model.model.load_state_dict(filtered_sd, strict=False)
-
-                    # last_model.save(trainer_last)
-
-                    # print(f"Saved to: {trainer_last}")
-
                     args = dict(model=fed_model_path,
                                 epochs=epochs,
                                 data=dataset_path,
@@ -136,9 +113,7 @@ class Trainning:
         src.Log.print_with_color("--- START TRAINING SECOND LAYER ---", "green")
 
         TRAINER = {
-            "detect": Split_Learning_DetectionTrainer,
-            "segment": Split_Learning_SegmentationTrainer,
-            "classify": Split_Learning_ClassificationTrainer,
+            "detect": Split_Learning_DetectionTrainer
         }
         TrainerClass = TRAINER.get(task)
         args = dict(model="./yolo11n.pt",

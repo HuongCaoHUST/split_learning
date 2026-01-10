@@ -7,7 +7,7 @@ import torch
 import time
 import src.Log
 from src.Client import Client
-from src.Trainning import Trainning
+from src.Training import Training
 import threading
 import psutil
 import requests
@@ -95,8 +95,8 @@ if __name__ == "__main__":
     metrics_thread = threading.Thread(target=push_metrics_loop, daemon=True)
     metrics_thread.start()
 
-    trainning = Trainning(client_id, args.layer_id, channel, device, args.event_time)
-    client = Client(client_id, args.layer_id, address, username, password, trainning.train_on_device, device, args.vm)
+    training = Training(client_id, args.layer_id, channel, device, args.event_time)
+    client = Client(client_id, args.layer_id, address, username, password, training.train_on_device, device, args.vm)
     client.send_to_server(data)
     time.sleep(8)
     client.wait_response()
