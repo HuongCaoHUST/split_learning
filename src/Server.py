@@ -179,7 +179,7 @@ class Server:
             docker = message["docker"]
             if self.register_clients == self.total_clients:
                 src.Log.print_with_color("All clients are connected. Sending notifications.", "green")
-                self.active_run = mlflow.start_run(run_name="Split Trainging")
+                self.active_run = mlflow.start_run(run_name="Split Training")
                 self.notify_to_clients(run_id=self.active_run.info.run_id)
 
         elif action == "NOTIFY":

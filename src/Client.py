@@ -2,12 +2,17 @@ import time
 import pickle
 import pika
 import random
+import glob
+from pathlib import Path
 
 import requests
 from torch import nn
 import src.Utils
 import src.Log
 import mlflow
+
+from ultralytics.data.utils import check_det_dataset, IMG_FORMATS
+
 
 class Client:
     def __init__(self, client_id, layer_id, address, username, password, train_func, device, virtual_machine=False):
@@ -68,10 +73,11 @@ class Client:
         run_id = self.response.get("run_id")
         if action == "START":
             src.Log.print_with_color(f"[<<<] Client received: {self.response}", "blue")
-            self.register_node_http(self.client_id, run_id=run_id)
             if self.layer_id == 1:
+                self.register_node_http(self.client_id, run_id=run_id, num_images=self._count_dataset_labels(dataset_path))
                 result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, num_round, task, epochs, batch_size, worker, self.address, self.username, self.password, load_partial_model, valid_epoch_model)
             if self.layer_id == 2:
+                self.register_node_http(self.client_id, run_id=run_id)
                 with mlflow.start_run(run_id=run_id):
                     result, best = self.train_func(model_path, dataset_path, num_client, cut_layer, num_round, task, epochs, batch_size, worker, self.address, self.username, self.password, load_partial_model, valid_epoch_model)
             
@@ -91,7 +97,7 @@ class Client:
             print("Training completed. Client stopping.")
             return False
 
-    def register_node_http(self, client_id, run_id, host="14.225.254.18", port=8000):
+    def register_node_http(self, client_id, run_id, num_images=None, host="14.225.254.18", port=8000):
         """
         Hàm đăng ký node qua API HTTP.
         """
@@ -101,6 +107,8 @@ class Client:
             "client_id": str(client_id),
             "run_id": str(run_id)
         }
+        if num_images is not None:
+            payload["number_images"] = num_images
         try:
             response = requests.post(url, json=payload)
             if response.status_code == 200:
@@ -109,3 +117,43 @@ class Client:
                 src.Log.print_with_color(f"API Register failed: {response.status_code} {response.text}", "red")
         except Exception as e:
             src.Log.print_with_color(f"API Register error: {e}", "red")
+
+    def _count_dataset_labels(self, dataset_path):
+        """Checks a dataset YAML file, derives label paths, and counts label files."""
+        if not dataset_path:
+            return
+
+        try:
+            data = check_det_dataset(dataset_path)  # Load and check dataset
+
+            # Count labels in the training set
+            train_path = data.get('train')
+            if train_path:
+                label_files = []
+                # Handle single path string or list of paths
+                paths = [train_path] if isinstance(train_path, str) else train_path
+                for p in paths:
+                    # Derive label path from image path by replacing 'images' with 'labels'
+                    label_p = Path(str(p).replace("images", "labels"))
+                    if label_p.is_dir():
+                        label_files.extend(label_p.rglob("*.txt"))
+                train_labels = len(label_files)
+                
+
+            # Count labels in the validation set
+            val_path = data.get('val')
+            if val_path:
+                label_files = []
+                # Handle single path string or list of paths
+                paths = [val_path] if isinstance(val_path, str) else val_path
+                for p in paths:
+                    # Derive label path from image path by replacing 'images' with 'labels'
+                    label_p = Path(str(p).replace("images", "labels"))
+                    if label_p.is_dir():
+                        label_files.extend(label_p.rglob("*.txt"))
+                val_labels = len(label_files)
+
+            return train_labels
+
+        except Exception as e:
+            print(f"Lỗi khi xử lý dataset: {e}")
