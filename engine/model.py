@@ -239,7 +239,6 @@ class Split_Learning_DetectionModel(DetectionModel):
             if self.is_training and m.i in self.tensor_send_ids and self.layer_id == 1:
                 # data_store[m.i] = x.detach().clone().requires_grad_(True)
                 data_store[m.i] = x.detach().requires_grad_(True)
-                print(f"Shape of detached tensor at layer {m.i}: {x.detach().shape}")
 
             if m.i in embed:
                 embeddings.append(torch.nn.functional.adaptive_avg_pool2d(x, (1, 1)).squeeze(-1).squeeze(-1))
@@ -274,8 +273,6 @@ class Split_Learning_DetectionModel(DetectionModel):
                             'label/tensor': "tensor",
                             'size': len(message)
                         })
-
-        print(f"Data_store {data_id} đã được gửi tới {queue_name}, Kích thước: {len(message)} bytes")
         return True
     
     def get_tensor_send_id (self, cut_layer):
