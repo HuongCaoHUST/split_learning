@@ -40,7 +40,7 @@ class Training:
             "detect": Split_Learning_DetectionTrainer
         }
         TrainerClass = TRAINER.get(task)
-        args = dict(model="yolo11n.yaml",
+        args = dict(model="yolo11n.pt",
                     data=dataset_path,
                     pretrained="./yolo11n.pt",
                     epochs=epochs,

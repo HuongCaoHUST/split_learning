@@ -739,7 +739,7 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
 
         message = pickle.dumps(
             {"data_id": data_id,
-            "gadients": gradients}
+            "gradients": gradients}
         )
 
         self.channel.basic_publish(
@@ -769,9 +769,9 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                         received_data = pickle.loads(body)
                         data_id = received_data.get('data_id')
                         print("\nDATA_ID backward: ", data_id)
-                        gradient_store = received_data.get('gadients', {})
+                        gradient_store = received_data.get('gradients', {})
                         if not isinstance(gradient_store, dict):
-                            raise ValueError("Received 'gadients' is not a valid dictionary")
+                            raise ValueError("Received 'gradients' is not a valid dictionary")
                         
                         gradient_dict = {}
 
@@ -860,10 +860,10 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                 try:
                     received_data = pickle.loads(body)
                     data_id = received_data.get('data_id')
-                    gradient_store = received_data.get('gadients', {})
+                    gradient_store = received_data.get('gradients', {})
 
                     if not isinstance(gradient_store, dict):
-                        raise ValueError("Received 'gadients' is not a valid dictionary")
+                        raise ValueError("Received 'gradients' is not a valid dictionary")
 
                     gradient_dict = {}
 
@@ -1806,7 +1806,7 @@ class Split_Learning_ClassificationTrainer(ClassificationTrainer):
 
         message = pickle.dumps(
             {"data_id": data_id,
-            "gadients": gradients}
+            "gradients": gradients}
         )
 
         self.channel.basic_publish(
@@ -1832,10 +1832,10 @@ class Split_Learning_ClassificationTrainer(ClassificationTrainer):
                 try:
                     received_data = pickle.loads(body)
                     data_id = received_data.get('data_id')
-                    gradient_store = received_data.get('gadients', {})
+                    gradient_store = received_data.get('gradients', {})
 
                     if not isinstance(gradient_store, dict):
-                        raise ValueError("Received 'gadients' is not a valid dictionary")
+                        raise ValueError("Received 'gradients' is not a valid dictionary")
 
                     gradient_dict = {}
 
@@ -1872,9 +1872,9 @@ class Split_Learning_ClassificationTrainer(ClassificationTrainer):
                         received_data = pickle.loads(body)
                         data_id = received_data.get('data_id')
                         print("\nDATA_ID backward: ", data_id)
-                        gradient_store = received_data.get('gadients', {})
+                        gradient_store = received_data.get('gradients', {})
                         if not isinstance(gradient_store, dict):
-                            raise ValueError("Received 'gadients' is not a valid dictionary")
+                            raise ValueError("Received 'gradients' is not a valid dictionary")
                         
                         gradient_dict = {}
 
