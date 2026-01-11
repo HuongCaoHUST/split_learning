@@ -2,7 +2,8 @@ import time
 import pickle
 import pika
 from tqdm import tqdm
-from split_learning.models.yolo.detect.train_edge_side import Split_Learning_DetectionTrainer
+from split_learning.models.yolo.detect.train_edge_side import Split_Learning_Edge_DetectionTrainer
+from split_learning.models.yolo.detect.train_server_side import  Split_Learning_Server_DetectionTrainer
 import src.Log
 from ultralytics import YOLO
 import torch
@@ -37,7 +38,7 @@ class Training:
 
         yaml_model = create_yaml_model('yolo11n.yaml', 'yolo11n_custom.yaml', cut_layer=cut_layer)
         TRAINER = {
-            "detect": Split_Learning_DetectionTrainer
+            "detect": Split_Learning_Edge_DetectionTrainer
         }
         TrainerClass = TRAINER.get(task)
         args = dict(model="yolo11n.pt",
@@ -113,10 +114,10 @@ class Training:
         src.Log.print_with_color("--- START TRAINING SECOND LAYER ---", "green")
 
         TRAINER = {
-            "detect": Split_Learning_DetectionTrainer
+            "detect": Split_Learning_Server_DetectionTrainer
         }
         TrainerClass = TRAINER.get(task)
-        args = dict(model="./yolo11n.pt",
+        args = dict(model="./yolo11n.yaml",
                     data=dataset_path,
                     epochs=epochs,
                     batch=batch_size,

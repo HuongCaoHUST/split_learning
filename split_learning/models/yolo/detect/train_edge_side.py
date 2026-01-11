@@ -38,7 +38,7 @@ from ultralytics.utils.torch_utils import (
 )
 import threading
 
-class Split_Learning_DetectionTrainer(DetectionTrainer):
+class Split_Learning_Edge_DetectionTrainer(DetectionTrainer):
     def __init__(self, overrides, client_id=None, layer_id=None, num_client=None, cut_layer=None, address=None, username=None, password=None, load_partial_model=False, FedAvg=False):
         self.client_id = client_id
         self.layer_id = layer_id
