@@ -154,11 +154,8 @@ class Split_Learning_DetectionModel(DetectionModel):
         embed = frozenset(embed) if embed is not None else {-1}
         max_idx = max(embed)
         data_store = {}
-        start_layer = self.cut_layer + 1 if self.is_training and self.layer_id == 2 else 0
-        y = [None] * len(self.model)
-        for m in self.model[start_layer:]:
-            if m.i == self.cut_layer + 1  and self.layer_id == 1:
-                break
+        y = []
+        for m in self.model:
             if m.f != -1:
                 if isinstance(m.f, int):
                     x = y[m.f]
@@ -166,10 +163,10 @@ class Split_Learning_DetectionModel(DetectionModel):
                     x = [y[j] if j != -1 else x for j in m.f]
             if profile:
                 self._profile_one_layer(m, x, dt)
-            
-            x = m(x)
-            if m.i in self.save:
-                y[m.i] = x
+
+            x = m(x)  # run
+            y.append(x if m.i in self.save else None)  # save output
+
             if visualize:
                 feature_visualization(x, m.type, m.i, save_dir=visualize)
 
