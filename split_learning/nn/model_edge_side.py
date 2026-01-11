@@ -108,7 +108,7 @@ class Split_Learning_DetectionModel(DetectionModel):
         self.inplace = self.yaml.get("inplace", True)
         self.end2end = getattr(self.model[-1], "end2end", False)
 
-        # Build strides (giữ nguyên code gốc)
+        # Build strides
         m = self.model[-1]  
         if isinstance(m, Detect):
             s = 256  
@@ -173,7 +173,7 @@ class Split_Learning_DetectionModel(DetectionModel):
             if visualize:
                 feature_visualization(x, m.type, m.i, save_dir=visualize)
 
-            if self.is_training and m.i in self.tensor_send_ids and self.layer_id == 1:
+            if self.is_training and m.i in self.tensor_send_ids:
                 data_store[m.i] = x.detach().requires_grad_(True)
 
             if m.i in embed:
@@ -181,7 +181,7 @@ class Split_Learning_DetectionModel(DetectionModel):
                 if m.i == max_idx:
                     return torch.unbind(torch.cat(embeddings, 1), dim=0)
 
-        if self.is_training and self.layer_id == 1:
+        if self.is_training:
             self.data_store = data_store
             data_id = f"{self.client_id}_{self.batch_id}"
             success = self.send_service.send_to_intermediate_queue(data_id, data_store, self.label)

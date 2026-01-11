@@ -236,9 +236,7 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
         nb = len(self.train_loader)  # number of batches
         nw = max(round(self.args.warmup_epochs * nb), 100) if self.args.warmup_epochs > 0 else -1  # warmup iterations
         last_opt_step = -1
-        self.epoch_time = None
-        self.epoch_time_start = time.time()
-        self.train_time_start = time.time()
+
         self.run_callbacks("on_train_start")
         LOGGER.info(
                 f"Image sizes {self.args.imgsz} train, {self.args.imgsz} val\n"
@@ -264,7 +262,6 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
 
         LOGGER.info(f"START TRAINING IN CLIENT 1")
         while True:
-            start_epoch_time = time.time()
             self.epoch = epoch
             self.run_callbacks("on_train_epoch_start")
             with warnings.catch_warnings():
@@ -406,9 +403,7 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                     self.run_callbacks("on_model_save")
 
             # Scheduler
-            t = time.time()
-            self.epoch_time = t - self.epoch_time_start
-            self.epoch_time_start = t
+
             if self.args.time:
                 mean_epoch_time = (t - self.train_time_start) / (epoch - self.start_epoch + 1)
                 self.epochs = self.args.epochs = math.ceil(self.args.time * 3600 / mean_epoch_time)
