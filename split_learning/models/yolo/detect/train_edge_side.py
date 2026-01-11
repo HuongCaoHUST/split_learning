@@ -51,16 +51,13 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
         self.load_partial_model = load_partial_model
         self.status_train = False
         self.count_batch = 0
-        
-        # Nhận rabbitmq từ tham số address (vì Client truyền rabbitmq vào vị trí này)
+
         if isinstance(address, RabbitMQConnection):
             self.rabbitmq = address
-            # Lấy thông tin đăng nhập từ rabbitmq object để tạo connection mới cho thread
             self.address = self.rabbitmq.address
             self.username = self.rabbitmq.username
             self.password = self.rabbitmq.password
         else:
-            # Fallback nếu truyền string như cũ
             self.rabbitmq = RabbitMQConnection(self.address, self.username, self.password)
             self.rabbitmq.connect()
 
@@ -220,11 +217,7 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
             )
 
         # Tensor IDS get
-        if self.layer_id == 1:
-            self.tensor_send_ids = self.get_tensor_send_id(self.cut_layer)
-        elif self.layer_id == 2:
-            self.cut_layer_ids = []
-            self.tensor_send_ids = []
+        self.tensor_send_ids = self.get_tensor_send_id(self.cut_layer)
 
         # Scheduler
         self._setup_scheduler()
@@ -239,19 +232,9 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
             self._setup_ddp(world_size)
         self._setup_train(world_size)
         self.model.channel = self.channel
-        if self.layer_id == 1:
-            nb = len(self.train_loader)  # number of batches
-            nw = max(round(self.args.warmup_epochs * nb), 100) if self.args.warmup_epochs > 0 else -1  # warmup iterations
-        else:
-            nb = self.wait_for_number_batch_client_id()
-            print("Self.tensor_send_ids: ", self.tensor_send_ids)
-            print("Seld.client_ids: ", self.client_ids)
-            print("Seld.cut_layer_ids: ", self.cut_layer_ids)
-            print("Sum number batch: ", nb)
-            self.model.client_ids = self.client_ids
-            self.model.cut_layer_ids = self.cut_layer_ids
-            self.model.tensor_send_ids = self.tensor_send_ids
-            nw = 1
+        self.model.send_service = self.send_service
+        nb = len(self.train_loader)  # number of batches
+        nw = max(round(self.args.warmup_epochs * nb), 100) if self.args.warmup_epochs > 0 else -1  # warmup iterations
         last_opt_step = -1
         self.epoch_time = None
         self.epoch_time_start = time.time()

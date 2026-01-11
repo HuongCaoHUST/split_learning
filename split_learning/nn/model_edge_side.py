@@ -87,7 +87,7 @@ class Split_Learning_DetectionModel(DetectionModel):
         self.client_ids = None
         self.batch_id = None
         self.label = None
-        self.send_service = send_service
+        self.send_service = None
         super(BaseModel, self).__init__()
         self.yaml = cfg if isinstance(cfg, dict) else yaml_model_load(cfg)  # cfg dict
         if self.yaml["backbone"][0][2] == "Silence":
@@ -155,7 +155,6 @@ class Split_Learning_DetectionModel(DetectionModel):
         max_idx = max(embed)
         data_store = {}
         start_layer = self.cut_layer + 1 if self.is_training and self.layer_id == 2 else 0
-
         y = [None] * len(self.model)
         for m in self.model[start_layer:]:
             if m.i == self.cut_layer + 1  and self.layer_id == 1:
@@ -185,28 +184,11 @@ class Split_Learning_DetectionModel(DetectionModel):
         if self.is_training and self.layer_id == 1:
             self.data_store = data_store
             data_id = f"{self.client_id}_{self.batch_id}"
-            success = self.send_to_intermediate_queue(data_id, data_store)
+            success = self.send_service.send_to_intermediate_queue(data_id, data_store, self.label)
             if not success:
                 print(f"Không thể gửi data_store tới intermediate_queue.")
         return x
-    
-    def send_to_intermediate_queue(self, data_id, data_store):
-        queue_name = f'intermediate_queue_{self.layer_id}'
-        self.channel.queue_declare(queue_name, durable=False)
 
-        message = pickle.dumps(
-            {"data_id": data_id,
-            "data_store": data_store,
-            "label": self.label}
-        )
-
-        self.channel.basic_publish(
-            exchange='',
-            routing_key=queue_name,
-            body=message
-        )
-        return True
-    
     def get_tensor_send_id (self, cut_layer):
         if cut_layer <=3:
             return [cut_layer]

@@ -29,8 +29,8 @@ class SendService:
         self.rabbitmq.publish(routing_key=queue_name, message=message)
         return None
 
-    def send_to_intermediate_queue(self, layer_id, data_id, data_store, label):
-        queue_name = f'intermediate_queue_{layer_id}'
+    def send_to_intermediate_queue(self, data_id, data_store, label):
+        queue_name = f'intermediate_queue_1'
         self.rabbitmq.declare_queue(queue_name, durable=False)
 
         message = {
