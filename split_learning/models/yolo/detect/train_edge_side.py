@@ -19,6 +19,8 @@ from ultralytics.data import build_dataloader
 from ultralytics.utils.checks import check_amp, check_imgsz
 from ultralytics.utils.plotting import plot_results
 from src import Utils
+from split_learning.communication.Communication import RabbitMQConnection
+from split_learning.communication.send_service import SendService
 from ultralytics.data import build_dataloader, build_yolo_dataset
 from ultralytics.models.yolo.detect import DetectionTrainer
 from split_learning.nn.model_edge_side import Split_Learning_DetectionModel
@@ -49,10 +51,27 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
         self.load_partial_model = load_partial_model
         self.status_train = False
         self.count_batch = 0
-        self.channel = Utils.connect_rabbitmq(self.address, self.username, self.password)
+        
+        # Nhận rabbitmq từ tham số address (vì Client truyền rabbitmq vào vị trí này)
+        if isinstance(address, RabbitMQConnection):
+            self.rabbitmq = address
+            # Lấy thông tin đăng nhập từ rabbitmq object để tạo connection mới cho thread
+            self.address = self.rabbitmq.address
+            self.username = self.rabbitmq.username
+            self.password = self.rabbitmq.password
+        else:
+            # Fallback nếu truyền string như cũ
+            self.rabbitmq = RabbitMQConnection(self.address, self.username, self.password)
+            self.rabbitmq.connect()
+
+        self.channel = self.rabbitmq.get_channel()
+        self.send_service = SendService(self.rabbitmq)
+
         if self.layer_id == 1:
             self.condition = threading.Condition()
-            self.channel_thread = Utils.connect_rabbitmq(self.address, self.username, self.password)
+            self.rabbitmq_thread = RabbitMQConnection(self.address, self.username, self.password)
+            self.rabbitmq_thread.connect()
+            self.channel_thread = self.rabbitmq_thread.get_channel()
             self.backward_flag = False
             self.num_forward = 0
 
@@ -438,23 +457,7 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
         self.run_callbacks("teardown")
 
     def send_number_batch_client_id(self, nb = None, client_id = None, client_cut_layer = None, tensor_send_ids = None):
-        queue_name = f'number_batch_queue'
-        self.channel.queue_declare(queue_name, durable=False)
-
-        message = pickle.dumps(
-            {"nb": nb,
-             "client_id": client_id,
-             "client_cut_layer": client_cut_layer,
-             "tensor_send_ids": tensor_send_ids}
-        )
-
-        self.channel.basic_publish(
-            exchange='',
-            routing_key=queue_name,
-            body=message
-        )
-        print(f"Number batch đã được gửi tới {queue_name}")
-        return True
+        return self.send_service.send_number_batch_client_id(nb, client_id, client_cut_layer, tensor_send_ids)
 
     def get_tensor_send_id (self, cut_layer):
         if cut_layer <=3:
@@ -514,7 +517,7 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
         queue_name = f'gradient_queue_{self.client_id}'
         try:
             while True:
-                q = self.channel_thread.queue_declare(queue=queue_name, passive=True)
+                q = self.rabbitmq_thread.declare_queue(queue_name, durable=False)
                 message_count = q.method.message_count
 
                 if message_count > 0:
@@ -537,7 +540,7 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
         tensor_send_ids = self.get_tensor_send_id(self.cut_layer)
         while True:
             queue_name = f'gradient_queue_{self.client_id}'
-            method_frame, header_frame, body = self.channel.basic_get(queue=queue_name, auto_ack=True)
+            method_frame, header_frame, body = self.rabbitmq.get_message(queue_name=queue_name, auto_ack=True)
             if method_frame and body:
                 try:
                     received_data = pickle.loads(body)

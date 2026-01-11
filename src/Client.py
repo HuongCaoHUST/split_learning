@@ -1,6 +1,5 @@
 import time
 import pickle
-import pika
 import random
 import glob
 from pathlib import Path
@@ -10,6 +9,8 @@ from torch import nn
 import src.Utils
 import src.Log
 import mlflow
+from split_learning.communication.Communication import RabbitMQConnection
+from split_learning.communication.send_service import SendService
 
 from ultralytics.data.utils import check_det_dataset, IMG_FORMATS
 
@@ -25,31 +26,25 @@ class Client:
         self.train_func = train_func
         self.virtual_machine = virtual_machine
         print(f"Client {self.client_id} initialized with layer {self.layer_id} on device {self.device}")
-        self.connect()
+        
+        self.rabbitmq = RabbitMQConnection(self.address, self.username, self.password)
+        self.rabbitmq.connect()
+        self.send_service = SendService(self.rabbitmq)
 
         mlflow.set_tracking_uri("http://14.225.254.18:5000")
         mlflow.set_experiment("Split_Learning")
     
-    def connect(self):
-        credentials = pika.PlainCredentials(self.username, self.password)
-        self.connection = pika.BlockingConnection(pika.ConnectionParameters(self.address, 5672, '/', credentials))
-        self.channel = self.connection.channel()
-
     def send_to_server(self, message):
-        self.connect()
         self.response = None
-        self.channel.queue_declare('Server_queue', durable=False)
-        self.channel.basic_publish(exchange='',
-                                   routing_key='Server_queue',
-                                   body=pickle.dumps(message))
+        self.send_service.send_to_server(message)
         return self.response
     
     def wait_response(self):
         status = True
         reply_queue_name = f'reply_{self.client_id}'
-        self.channel.queue_declare(reply_queue_name, durable=False)
+        self.rabbitmq.declare_queue(reply_queue_name, durable=False)
         while status:
-            method_frame, header_frame, body = self.channel.basic_get(queue=reply_queue_name, auto_ack=True)
+            method_frame, header_frame, body = self.rabbitmq.get_message(queue_name=reply_queue_name, auto_ack=True)
             if body:
                 status = self.response_message(body)
                 break
@@ -99,7 +94,7 @@ class Client:
 
     def register_node_http(self, client_id, run_id, num_images=None, host="14.225.254.18", port=8000):
         """
-        Hàm đăng ký node qua API HTTP.
+        Send register message to SL Backend
         """
         url = f"http://{host}:{port}/register"
         payload = {
@@ -121,10 +116,11 @@ class Client:
     def _count_dataset_labels(self, dataset_path):
         """Checks a dataset YAML file, derives label paths, and counts label files."""
         if not dataset_path:
-            return
+            return 0  # Return 0 if no dataset path is provided
 
         try:
             data = check_det_dataset(dataset_path)  # Load and check dataset
+            total_labels = 0
 
             # Count labels in the training set
             train_path = data.get('train')
@@ -137,7 +133,7 @@ class Client:
                     label_p = Path(str(p).replace("images", "labels"))
                     if label_p.is_dir():
                         label_files.extend(label_p.rglob("*.txt"))
-                train_labels = len(label_files)
+                total_labels += len(label_files)
                 
 
             # Count labels in the validation set
@@ -151,9 +147,10 @@ class Client:
                     label_p = Path(str(p).replace("images", "labels"))
                     if label_p.is_dir():
                         label_files.extend(label_p.rglob("*.txt"))
-                val_labels = len(label_files)
+                total_labels += len(label_files)
 
-            return train_labels
+            return total_labels
 
         except Exception as e:
-            print(f"Lỗi khi xử lý dataset: {e}")
+            print(f"Error processing dataset: {e}")
+            return 0

@@ -74,21 +74,20 @@ from ultralytics.nn.modules import (
 class Split_Learning_DetectionModel(DetectionModel):
     def __init__(self, cfg=None, nc=None, ch=3, verbose=True, 
                  layer_id=None, client_id=None, num_client=None, cut_layer=None,
-                 address=None, username=None, password=None, load_partial_model = False):
+                 address=None, username=None, password=None, load_partial_model = False,
+                 send_service=None):
         self.layer_id = layer_id
         self.client_id = client_id
         self.num_client = num_client
         self.cut_layer = cut_layer
         self.cut_layer_ids = None
-        # RabbitMQ
-        self.address = address
-        self.username = username
-        self.password = password
+
         self.load_partial_model = load_partial_model
         self.is_training = False
         self.client_ids = None
         self.batch_id = None
         self.label = None
+        self.send_service = send_service
         super(BaseModel, self).__init__()
         self.yaml = cfg if isinstance(cfg, dict) else yaml_model_load(cfg)  # cfg dict
         if self.yaml["backbone"][0][2] == "Silence":
@@ -157,12 +156,9 @@ class Split_Learning_DetectionModel(DetectionModel):
         data_store = {}
         start_layer = self.cut_layer + 1 if self.is_training and self.layer_id == 2 else 0
 
-        max_retries = 1000
-        retry_delay = 1
         y = [None] * len(self.model)
         for m in self.model[start_layer:]:
             if m.i == self.cut_layer + 1  and self.layer_id == 1:
-                # print(f"Cut layer {m.i} reached, stopping forward pass.")
                 break
             if m.f != -1:
                 if isinstance(m.f, int):
@@ -179,7 +175,6 @@ class Split_Learning_DetectionModel(DetectionModel):
                 feature_visualization(x, m.type, m.i, save_dir=visualize)
 
             if self.is_training and m.i in self.tensor_send_ids and self.layer_id == 1:
-                # data_store[m.i] = x.detach().clone().requires_grad_(True)
                 data_store[m.i] = x.detach().requires_grad_(True)
 
             if m.i in embed:
@@ -253,24 +248,8 @@ class Split_Learning_DetectionModel(DetectionModel):
             return [16, 19, cut_layer]
         elif cut_layer == 22:
             return [16, 19, cut_layer]
-    
-
-    def check_foward(self, forward_queue):
-        queue_name = f'intermediate_queue_{self.layer_id - 1}'
-        while True:
-            try:
-                if self.channel is not None and self.channel.is_open:
-                    method_frame, header_frame, body = self.channel.basic_get(queue=queue_name, auto_ack=True)
-                    if method_frame and body:
-                        received_data = pickle.loads(body)
-                        data_id = received_data.get('data_id', {})
-                        print("DATA_ID: ", data_id)
-                else:
-                    print("Thread channel is None or closed")
-            except Exception as e:
-                print("Error in check_forward thread:", e)
-                break
-            time.sleep(0.2)
+        elif cut_layer == 23:
+            return [16, 19, 22]
 
     def parse_model_SL(self, d, ch, verbose=True, layer_id = None, cut_layer = None, load_partial_model = False):
         """
@@ -449,4 +428,3 @@ class Split_Learning_DetectionModel(DetectionModel):
                     ch = []
                 ch.append(c2)
         return torch.nn.Sequential(*layers), sorted(save)
-        
