@@ -282,8 +282,6 @@ class Split_Learning_Server_DetectionTrainer(DetectionTrainer):
                         if "momentum" in x:
                             x["momentum"] = np.interp(ni, xi, [self.args.warmup_momentum, self.args.momentum])
                 datastore, batch = self.wait_for_batch()
-                print(type(datastore))
-                print(getattr(datastore, "shape", None))
                 batch["img"] = datastore
 
                 # Forward

@@ -155,7 +155,6 @@ class Split_Learning_DetectionModel(DetectionModel):
         max_idx = max(embed)
         data_store = {}
         y = []
-        print("New predict")
         for m in self.model:
             if m.f != -1:
                 if isinstance(m.f, int):
@@ -408,17 +407,3 @@ class Split_Learning_DetectionModel(DetectionModel):
                 ch = []
             ch.append(c2)
         return torch.nn.Sequential(*layers), sorted(save)
-
-    def loss(self, batch, preds=None):
-        """
-        Compute loss.
-
-        Args:
-            batch (dict): Batch to compute loss on.
-            preds (torch.Tensor | List[torch.Tensor], optional): Predictions.
-        """
-        if getattr(self, "criterion", None) is None:
-            self.criterion = self.init_criterion()
-
-        preds = self.forward(batch) if preds is None else preds
-        return self.criterion(preds, batch)

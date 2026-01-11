@@ -151,6 +151,7 @@ class BaseModel(torch.nn.Module):
         Returns:
             (torch.Tensor): The last output of the model.
         """
+        print("In predict: ", x)
         if augment:
             return self._predict_augment(x)
         return self._predict_once(x, profile, visualize, embed)
