@@ -108,25 +108,26 @@ class Split_Learning_DetectionModel(DetectionModel):
         self.inplace = self.yaml.get("inplace", True)
         self.end2end = getattr(self.model[-1], "end2end", False)
 
-        # Build strides (giữ nguyên code gốc)
-        m = self.model[-1]  
-        if isinstance(m, Detect):
-            s = 256  
+        # Build strides
+        m = self.model[-1]  # Detect()
+        if isinstance(m, Detect):  # includes all Detect subclasses like Segment, Pose, OBB, YOLOEDetect, YOLOESegment
+            s = 256  # 2x min stride
             m.inplace = self.inplace
 
             def _forward(x):
+                """Perform a forward pass through the model, handling different Detect subclass types accordingly."""
                 if self.end2end:
                     return self.forward(x)["one2many"]
                 return self.forward(x)[0] if isinstance(m, (Segment, YOLOESegment, Pose, OBB)) else self.forward(x)
 
-            self.model.eval()  
-            m.training = True  
-            m.stride = torch.tensor([s / x.shape[-2] for x in _forward(torch.zeros(1, ch, s, s))])  
+            self.model.eval()  # Avoid changing batch statistics until training begins
+            m.training = True  # Setting it to True to properly return strides
+            m.stride = torch.tensor([s / x.shape[-2] for x in _forward(torch.zeros(1, ch, s, s))])  # forward
             self.stride = m.stride
-            self.model.train()  
-            m.bias_init()  
+            self.model.train()  # Set model back to training(default) mode
+            m.bias_init()  # only run once
         else:
-            self.stride = torch.Tensor([32])  
+            self.stride = torch.Tensor([32])  # default stride for i.e. RTDETR
 
         # Init weights, biases
         initialize_weights(self)

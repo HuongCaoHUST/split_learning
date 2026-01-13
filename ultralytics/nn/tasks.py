@@ -133,7 +133,7 @@ class BaseModel(torch.nn.Module):
         Returns:
             (torch.Tensor): Loss if x is a dict (training), or network predictions (inference).
         """
-        if isinstance(x, dict):  # for cases of training and validating while training.
+        if isinstance(x, dict) and "cls" in x and "img" in x:  # for cases of training and validating while training.
             return self.loss(x, *args, **kwargs)
         return self.predict(x, *args, **kwargs)
 
@@ -151,7 +151,6 @@ class BaseModel(torch.nn.Module):
         Returns:
             (torch.Tensor): The last output of the model.
         """
-        print("In predict: ", x)
         if augment:
             return self._predict_augment(x)
         return self._predict_once(x, profile, visualize, embed)
@@ -333,8 +332,8 @@ class BaseModel(torch.nn.Module):
         """
         if getattr(self, "criterion", None) is None:
             self.criterion = self.init_criterion()
-
         preds = self.forward(batch["img"]) if preds is None else preds
+        # print("PREDS: ", preds)
         return self.criterion(preds, batch)
 
     def init_criterion(self):

@@ -226,7 +226,9 @@ class Split_Learning_Server_DetectionTrainer(DetectionTrainer):
         nw = -1
 
         last_opt_step = -1
-
+        self.epoch_time = None
+        self.epoch_time_start = time.time()
+        self.train_time_start = time.time()
         self.run_callbacks("on_train_start")
         LOGGER.info(
             f"Image sizes {self.args.imgsz} train, {self.args.imgsz} val\n"
@@ -283,6 +285,17 @@ class Split_Learning_Server_DetectionTrainer(DetectionTrainer):
                             x["momentum"] = np.interp(ni, xi, [self.args.warmup_momentum, self.args.momentum])
                 datastore, batch = self.wait_for_batch()
                 batch["img"] = datastore
+
+                detect_layer = self.model.model[-1]
+                # Nếu stride chưa đúng (ví dụ chỉ có [8.]), hãy set cứng lại
+                if hasattr(detect_layer, 'stride'):
+                    print(f"Old Stride: {detect_layer.stride}")
+                    # Set stride chuẩn cho YOLO: 8, 16, 32
+                    detect_layer.stride = torch.tensor([8., 16., 32.]).to(detect_layer.stride.device)
+
+                    # Cập nhật luôn cho model chính để hàm Loss nhìn thấy
+                    self.model.stride = detect_layer.stride
+                    print(f"New Stride Forced: {self.model.stride}")
 
                 # Forward
                 with autocast(self.amp):
@@ -345,7 +358,7 @@ class Split_Learning_Server_DetectionTrainer(DetectionTrainer):
                             f"{self._get_memory():.3g}G",  # (GB) GPU memory util
                             *(self.tloss if loss_length > 1 else torch.unsqueeze(self.tloss, 0)),  # losses
                             batch["cls"].shape[0],  # batch size, i.e. 8
-                            batch["img"].shape[-1],  # imgsz, i.e 640
+                            batch["img"][4].shape[-1],  # imgsz, i.e 640
                         )
                     )
                     self.run_callbacks("on_batch_end")

@@ -109,24 +109,25 @@ class Split_Learning_DetectionModel(DetectionModel):
         self.end2end = getattr(self.model[-1], "end2end", False)
 
         # Build strides
-        m = self.model[-1]  
-        if isinstance(m, Detect):
-            s = 256  
+        m = self.model[-1]  # Detect()
+        if isinstance(m, Detect):  # includes all Detect subclasses like Segment, Pose, OBB, YOLOEDetect, YOLOESegment
+            s = 256  # 2x min stride
             m.inplace = self.inplace
 
             def _forward(x):
+                """Perform a forward pass through the model, handling different Detect subclass types accordingly."""
                 if self.end2end:
                     return self.forward(x)["one2many"]
                 return self.forward(x)[0] if isinstance(m, (Segment, YOLOESegment, Pose, OBB)) else self.forward(x)
 
-            self.model.eval()  
-            m.training = True  
-            m.stride = torch.tensor([s / x.shape[-2] for x in _forward(torch.zeros(1, ch, s, s))])  
+            self.model.eval()  # Avoid changing batch statistics until training begins
+            m.training = True  # Setting it to True to properly return strides
+            m.stride = torch.tensor([s / x.shape[-2] for x in _forward(torch.zeros(1, ch, s, s))])  # forward
             self.stride = m.stride
-            self.model.train()  
-            m.bias_init()  
+            self.model.train()  # Set model back to training(default) mode
+            m.bias_init()  # only run once
         else:
-            self.stride = torch.Tensor([32])  
+            self.stride = torch.Tensor([32])  # default stride for i.e. RTDETR
 
         # Init weights, biases
         initialize_weights(self)
@@ -153,37 +154,41 @@ class Split_Learning_DetectionModel(DetectionModel):
         dt, embeddings = [], []
         embed = frozenset(embed) if embed is not None else {-1}
         max_idx = max(embed)
-        data_store = {}
-        y = []
-        for m in self.model:
-            if m.f != -1:
-                if isinstance(m.f, int):
-                    x = y[m.f]
-                else:
-                    x = [y[j] if j != -1 else x for j in m.f]
-            if profile:
-                self._profile_one_layer(m, x, dt)
+        y = [None] * (self.cut_layer + 1)
+        if self.is_training == True:
+            print("Tensor 4: ", x[4].shape)
+            print("Tensor 6: ", x[6].shape)
+            print("Tensor 10: ", x[10].shape)
+            y[4] = x[4]
+            y[6] = x[6]
+            y[10] = x[10]
+            x = x[10]
+            for m in self.model[self.cut_layer + 1:]:
+                if m.f != -1:  # if not from previous layer
+                    # print("M.F: ", m.f)
 
-            x = m(x)  # run
-            y.append(x if m.i in self.save else None)  # save output
+                    # for idx, yi in enumerate(y):
+                    #     if yi is None:
+                    #         print(f"y[{idx}] = None")
+                    #     else:
+                    #         print(
+                    #             f"y[{idx}] shape={tuple(yi.shape)}, "
+                    #             f"sample={yi.flatten()[:5].tolist()}"
+                    #         )
 
-            if visualize:
-                feature_visualization(x, m.type, m.i, save_dir=visualize)
+                    x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
+                if profile:
+                    self._profile_one_layer(m, x, dt)
+                x = m(x)  # run
+                y.append(x if m.i in self.save else None)  # save output
 
-            if self.is_training and m.i in self.tensor_send_ids:
-                data_store[m.i] = x.detach().requires_grad_(True)
+                if visualize:
+                    feature_visualization(x, m.type, m.i, save_dir=visualize)
 
-            if m.i in embed:
-                embeddings.append(torch.nn.functional.adaptive_avg_pool2d(x, (1, 1)).squeeze(-1).squeeze(-1))
-                if m.i == max_idx:
-                    return torch.unbind(torch.cat(embeddings, 1), dim=0)
-
-        if self.is_training:
-            self.data_store = data_store
-            data_id = f"{self.client_id}_{self.batch_id}"
-            success = self.send_service.send_to_intermediate_queue(data_id, data_store, self.label)
-            if not success:
-                print(f"Không thể gửi data_store tới intermediate_queue.")
+                if m.i in embed:
+                    embeddings.append(torch.nn.functional.adaptive_avg_pool2d(x, (1, 1)).squeeze(-1).squeeze(-1))
+                    if m.i == max_idx:
+                        return torch.unbind(torch.cat(embeddings, 1), dim=0)
         return x
 
     def get_tensor_send_id (self, cut_layer):

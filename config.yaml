@@ -33,7 +33,7 @@ model:
 
 dataset:
   dataset_path:
-    - ./datasets/livingroom_4_2.yaml
+    - ./datasets/coco8.yaml
     - ./datasets/livingroom_4_2.yaml
     - ./datasets/VOC_clients_client8_alpha01/VOC3.yaml
     - ./datasets/VOC_clients_client8_alpha01/VOC4.yaml
