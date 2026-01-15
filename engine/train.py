@@ -28,6 +28,8 @@ from engine.data import check_det_dataset
 from copy import deepcopy
 from datetime import datetime
 from src import Utils
+from engine.communication.Communication import RabbitMQConnection
+from engine.communication.send_service import SendService
 from ultralytics.utils import (
     DEFAULT_CFG,
     LOCAL_RANK,
@@ -67,11 +69,24 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
         Utils.init_csv('./log/com_cost.csv', ['batch_id', 'label/tensor', 'size'])
         self.status_train = False
         self.count_batch = 0
-        self.channel = Utils.connect_rabbitmq(self.address, self.username, self.password)
-        # self.channel.basic_consume(queue=f'gradient_queue_{self.client_id}', on_message_callback=self.on_request)
+
+        if isinstance(address, RabbitMQConnection):
+            self.rabbitmq = address
+            self.address = self.rabbitmq.address
+            self.username = self.rabbitmq.username
+            self.password = self.rabbitmq.password
+        else:
+            self.rabbitmq = RabbitMQConnection(self.address, self.username, self.password)
+            self.rabbitmq.connect()
+
+        self.channel = self.rabbitmq.get_channel()
+        self.send_service = SendService(self.rabbitmq)
+
         if self.layer_id == 1:
             self.condition = threading.Condition()
-            self.channel_thread = Utils.connect_rabbitmq(self.address, self.username, self.password)
+            self.rabbitmq_thread = RabbitMQConnection(self.address, self.username, self.password)
+            self.rabbitmq_thread.connect()
+            self.channel_thread = self.rabbitmq_thread.get_channel()
             self.backward_flag = False
             self.num_forward = 0
 

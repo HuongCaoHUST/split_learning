@@ -1,67 +1,31 @@
 import os
 import time
-import pika
 import pickle
 import sys
 import yaml
-import numpy as np
-import requests
-import random
+import mlflow
 from ultralytics.data.utils import check_det_dataset
-from requests.auth import HTTPBasicAuth
 import src.Log
 import src.Utils
 from src.Validation import ModelValidator
-from src.Utils import split_dataset, calculate_latency
-import mlflow
-
-def delete_old_queues(address, username, password):
-    url = f'http://{address}:15672/api/queues'
-
-    while True:
-        try:
-            response = requests.get(url, auth=HTTPBasicAuth(username, password))
-            if response.status_code == 200:
-                break
-            else:
-                src.Log.print_with_color(f"⚠️ Waiting for RabbitMQ API... Status: {response.status_code}", "yellow")
-        except requests.exceptions.ConnectionError:
-            src.Log.print_with_color("⏳ Waiting for RabbitMQ HTTP API to be ready...", "yellow")
-        time.sleep(1)
-
-    if response.status_code == 200:
-        queues = response.json()
-
-        credentials = pika.PlainCredentials(username, password)
-        connection = pika.BlockingConnection(pika.ConnectionParameters(address, 5672, '/', credentials))
-        http_channel = connection.channel()
-
-        for queue in queues:
-            queue_name = queue['name']
-            if queue_name.startswith("reply") or queue_name.startswith("intermediate_queue") or queue_name.startswith(
-                    "gradient_queue") or queue_name.startswith("label_queue"):
-                try:
-                    http_channel.queue_delete(queue=queue_name)
-                    src.Log.print_with_color(f"Queue '{queue_name}' deleted.", "green")
-                except Exception as e:
-                    src.Log.print_with_color(f"Failed to delete queue '{queue_name}': {e}", "yellow")
-
-        connection.close()
-        return True
-    else:
-        src.Log.print_with_color(
-            f"Failed to fetch queues from RabbitMQ Management API. Status code: {response.status_code}", "yellow")
-        return False
+from src.Utils import calculate_latency
+from engine.communication.Communication import RabbitMQConnection
+from engine.communication.NotificationService import NotificationService
+import random
 
 class Server:
     def __init__(self, config_dir):
         with open(config_dir, 'r') as file:
             config = yaml.safe_load(file)
 
+        # RabbitMQ setup
         self.address = config["rabbit"]["address"]
         self.username = config["rabbit"]["username"]
         self.password = config["rabbit"]["password"]
-        delete_old_queues(self.address, self.username, self.password)
+        RabbitMQConnection.delete_old_queues(self.address, self.username, self.password)
+        self.rabbitmq_conn = RabbitMQConnection(self.address, self.username, self.password)
+        self.rabbitmq_conn.connect()
+        self.notification_service = NotificationService(self.rabbitmq_conn)
 
         # Clients
         self.total_clients = config["server"]["clients"]
@@ -85,7 +49,6 @@ class Server:
             self.model_path = config["model"]["model_path_partial"]
         else:
             self.model_path = config["model"]["model_path"]
-        # self.model_path = self.get_model_path(self.task)
         self.cut_layer = config["model"]["cut_layer"]
         if len(self.total_clients) > len(self.cut_layer):
             self.cut_layer = [self.cut_layer[0] for _ in range(len(self.total_clients))]
@@ -95,12 +58,10 @@ class Server:
 
         #Dataset
         self.dataset_path = config["dataset"]["dataset_path"] if not config["dataset"]["iid_datasets"] else self.random_dataset(num_clients=self.total_clients[0])
-        # self.dataset_path = src.Utils.split_dataset(yaml_path=self.dataset_path[0], num_client=self.total_clients[0])
         print("Dataset paths for clients:", self.dataset_path)
 
         if len(self.total_clients) > len(self.dataset_path):
             self.dataset_path = [self.dataset_path[0] for _ in range(len(self.total_clients))]
-        # self.nb_client = src.Utils.check_dataset(self.dataset_path, self.batch_size)
 
         self.val_function = ModelValidator(
             total_client=self.total_clients,
@@ -120,11 +81,9 @@ class Server:
 
         log_path = config["log_path"]
 
-        self.connect()
+        self.rabbitmq_conn.declare_queue('Server_queue')
+        self.rabbitmq_conn.consume('Server_queue', self.on_request)
 
-        self.channel.queue_declare(queue='Server_queue')
-        self.channel.basic_qos(prefetch_count=1)
-        self.channel.basic_consume(queue='Server_queue', on_message_callback=self.on_request)
         self.logger = src.Log.Logger(f"{log_path}/app.log")
         filename = os.path.basename(config_dir)
         self.logger.log_info(f"Start Training - File config: {filename}")
@@ -135,20 +94,9 @@ class Server:
         # MLflow setup
         mlflow.set_tracking_uri("http://14.225.254.18:5000")
         mlflow.set_experiment("Split_Learning")
-        
 
-    def connect(self):
-        credentials = pika.PlainCredentials(self.username, self.password)
-        while True:
-            try:
-                self.connection = pika.BlockingConnection(pika.ConnectionParameters(self.address, 5672, '/', credentials))
-                self.channel = self.connection.channel()
-                break
-            except pika.exceptions.AMQPConnectionError:
-                time.sleep(1)
-    
     def start(self):
-        self.channel.start_consuming()
+        self.rabbitmq_conn.start_consuming()
 
     def concatenate_func(self):
         self.nc_list_cumulative = []
@@ -164,108 +112,111 @@ class Server:
 
     def on_request(self, ch, method, props, body):
         message = pickle.loads(body)
+        action = message.get("action")
         
-        routing_key = props.reply_to
-        action = message["action"]
+        handlers = {
+            "REGISTER": self._handle_register,
+            "NOTIFY": self._handle_notify,
+            "VAL_INTER": self._handle_val_inter,
+            "UPDATE": self._handle_update,
+        }
+        
+        handler = handlers.get(action)
+        if handler:
+            handler(message)
+        else:
+            src.Log.print_with_color(f"Unknown action: {action}", "yellow")
+
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+
+    def _handle_register(self, message):
         client_id = message["client_id"]
         layer_id = message["layer_id"]
 
         if (str(client_id), layer_id) not in self.list_clients:
             self.list_clients.append((str(client_id), layer_id))
 
-        if action == "REGISTER":
-            src.Log.print_with_color(f"[<<<] Received message from client: {message}", "blue")
-            self.register_clients[layer_id - 1] += 1
-            docker = message["docker"]
-            if self.register_clients == self.total_clients:
-                src.Log.print_with_color("All clients are connected. Sending notifications.", "green")
-                self.active_run = mlflow.start_run(run_name="Split Training")
-                self.notify_to_clients(run_id=self.active_run.info.run_id)
+        src.Log.print_with_color(f"[<<<] Received message from client: {message}", "blue")
+        self.register_clients[layer_id - 1] += 1
+        if self.register_clients == self.total_clients:
+            src.Log.print_with_color("All clients are connected. Sending notifications.", "green")
+            self.active_run = mlflow.start_run(run_name="Split Training")
+            self.notify_to_clients(run_id=self.active_run.info.run_id)
 
-        elif action == "NOTIFY":
-            src.Log.print_with_color(f"[<<<] Received message from client 1: {message}", "blue")
-            if layer_id == 1:
-                print("BEST MODEL FROM CLIENT:", message["best"])
-                print("LAST MODEL FROM CLIENT:", message["last"])
-                if message.get("round") == 1:
-                    self.last_model_layer_1.append(message["last"])
-                self.count[0] += 1
-            elif layer_id == 2:
-                print("BEST MODEL FROM CLIENT:", message["best"])
-                print("LAST MODEL FROM CLIENT:", message["last"])
-                print("[CHECK] ROUND: ", message.get("round"))
-                if message.get("round") == 1:
-                    self.last_model_layer_2.append(message["last"])
-                self.count[1] += 1
-                print("COUNT:", self.count)
-                print("Received all parameter clients")
-                print("LAST MODEL LAYER 1:", self.last_model_layer_1)
-                print("LAST MODEL LAYER 2:", self.last_model_layer_2)
-                if message.get("round") < self.num_round:
-                    avg_model_path =self.val_function.average_yolo_models(self.last_model_layer_1, "./fedavg_model_layer_1.pt")
-                    message = {"action": "CONTINUE",
-                        "message": "Continue training!",
-                        "model_path": avg_model_path}
-                    self.notify_to_all_clients(message)
-                else:
-                    message = {"action": "PAUSE",
-                        "message": "Pause training and please send your parameters",
-                        "parameters": None}
-                    src.Log.print_with_color(f"[>>>] Sent stop training request to client {client_id}", "red")
-                    self.notify_to_all_clients(message)
+    def _handle_notify(self, message):
+        layer_id = message["layer_id"]
+        src.Log.print_with_color(f"[<<<] Received message from client 1: {message}", "blue")
+        if layer_id == 1:
+            print("BEST MODEL FROM CLIENT:", message["best"])
+            print("LAST MODEL FROM CLIENT:", message["last"])
+            if message.get("round") == 1:
+                self.last_model_layer_1.append(message["last"])
+            self.count[0] += 1
+        elif layer_id == 2:
+            print("BEST MODEL FROM CLIENT:", message["best"])
+            print("LAST MODEL FROM CLIENT:", message["last"])
+            print("[CHECK] ROUND: ", message.get("round"))
+            if message.get("round") == 1:
+                self.last_model_layer_2.append(message["last"])
+            self.count[1] += 1
+            print("COUNT:", self.count)
+            print("Received all parameter clients")
+            print("LAST MODEL LAYER 1:", self.last_model_layer_1)
+            print("LAST MODEL LAYER 2:", self.last_model_layer_2)
+            if message.get("round") < self.num_round:
+                avg_model_path =self.val_function.average_yolo_models(self.last_model_layer_1, "./fedavg_model_layer_1.pt")
+                response_message = {"action": "CONTINUE",
+                    "message": "Continue training!",
+                    "model_path": avg_model_path}
+                self.notification_service.notify_to_all_clients(self.list_clients, response_message)
+            else:
+                response_message = {"action": "PAUSE",
+                    "message": "Pause training and please send your parameters",
+                    "parameters": None}
+                src.Log.print_with_color(f"[>>>] Sent stop training request to all clients", "red")
+                self.notification_service.notify_to_all_clients(self.list_clients, response_message)
 
+    def _handle_val_inter(self, message):
+        src.Log.print_with_color(f"[<<<] Received message from client: {message}", "blue")
+        layer_id = message["layer_id"]
+        layer_map = {
+            1: self.val_function.epoch_model_layer_1,
+            2: self.val_function.epoch_model_layer_2
+        }
+        if layer_id in layer_map:
+            layer_map[layer_id].append(message["epoch_intermediate"])
 
-        elif action == "VAL_INTER":
-            src.Log.print_with_color(f"[<<<] Received message from client: {message}", "blue")
-            client_id = message["client_id"]
-            layer_id = message["layer_id"]
-            layer_map = {
-                1: self.val_function.epoch_model_layer_1,
-                2: self.val_function.epoch_model_layer_2
-            }
-            if layer_id in layer_map:
-                layer_map[layer_id].append(message["epoch_intermediate"])
-         
-        elif action == "UPDATE":
-            client_id = message["client_id"]
-            virtual_machine=message["vm"]
-            if layer_id == 1 and not virtual_machine:
-                best = message["best"]
-                src.Log.print_with_color(f"[<<<] Received best model from client: {best}", "blue")
-                self.val_function.best_model_layer_1.append(best)
-                print("BEST_layer_1.pt:", best)
-            elif layer_id == 1 and virtual_machine:
-                best = message["best"]
-                best = src.Utils.save_model_file(best, best_dir="./best_model_vm")
-                src.Log.print_with_color(f"[<<<] Received best model from client: {best}", "blue")
-                self.val_function.best_model_layer_1.append(best)
-            
-            elif layer_id == 2:
-                best = message["best"]
-                src.Log.print_with_color(f"[<<<] Received best model from client: {best}", "blue")
-                self.val_function.best_model_2.append(best)
-                self.logger.log_info(f"Done training - {best}")
-                print("BEST_2.pt:", self.val_function.best_model_2)
-                # if len(self.val_function.best_model_layer_1) == self.total_clients[0] and len(self.val_function.best_model_2) == self.total_clients[1]:
-                #     self.val_function.validate_best_model()
+    def _handle_update(self, message):
+        layer_id = message["layer_id"]
+        virtual_machine = message["vm"]
+        if layer_id == 1 and not virtual_machine:
+            best = message["best"]
+            src.Log.print_with_color(f"[<<<] Received best model from client: {best}", "blue")
+            self.val_function.best_model_layer_1.append(best)
+            print("BEST_layer_1.pt:", best)
+        elif layer_id == 1 and virtual_machine:
+            best = message["best"]
+            best = src.Utils.save_model_file(best, best_dir="./best_model_vm")
+            src.Log.print_with_color(f"[<<<] Received best model from client: {best}", "blue")
+            self.val_function.best_model_layer_1.append(best)
+        
+        elif layer_id == 2:
+            best = message["best"]
+            src.Log.print_with_color(f"[<<<] Received best model from client: {best}", "blue")
+            self.val_function.best_model_2.append(best)
+            self.logger.log_info(f"Done training - {best}")
+            print("BEST_2.pt:", self.val_function.best_model_2)
+            mlflow.end_run()
+            calculate_latency()
+            sys.exit()
 
-                # self.val_function.validate_epoch_model()
-                mlflow.end_run()
-                src.Utils.calculate_latency()
-                sys.exit()
-
-        # Ack the message
-        ch.basic_ack(delivery_tag=method.delivery_tag)
-
-    def notify_to_clients(self, status="start", register=True, run_id=None):
-
+    def notify_to_clients(self, status="start", run_id=None):
         src.Log.print_with_color(f"notify_client", "red")
         print("self.list_client: ", self.list_clients)
-        self.layer1_clients = [(client_id, layer_id) for client_id, layer_id in self.list_clients if layer_id == 1]
-        self.layer1_clients_id = [client_id for client_id, layer_id in self.list_clients if layer_id == 1]
 
         dataset_index = 0
         for (client_id, layer_id) in self.list_clients:
+            response = {}
             if status == "start":
                 response = {"action": "START",
                             "message": "Server accept the connection!",
@@ -285,7 +236,7 @@ class Server:
                     response["model_path"] = self.model_path[0]
                     response["cut_layer"] = self.cut_layer[dataset_index]
                     response["dataset_path"] = self.dataset_path[dataset_index]
-                    if self.concatenate_datasets and dataset_index !=0:
+                    if self.concatenate_datasets and dataset_index != 0:
                         delta_nc = self.nc_list_cumulative[dataset_index - 1]
                         response["concatenate_datasets"] = True
                         response["delta_nc"] = delta_nc
@@ -294,32 +245,14 @@ class Server:
                     response["model_path"] = self.model_path[0]
                     response["cut_layer"] = self.cut_layer[0]
                     response["dataset_path"] = self.dataset_path[0]
+                
                 self.time_start = time.time_ns()
-                src.Log.print_with_color(f"[>>>] Sent start training request to client {client_id}", "red")
-                self.send_to_client(client_id, pickle.dumps(response))
+                self.notification_service.send_to_client(client_id, response)
             
             if status == "continue":
                 response = {"action": "CONTINUE"}
                 if layer_id == 1:
-                    src.Log.print_with_color(f"[>>>] Sent CONTINUE training request to client {client_id}", "red")
-                    self.send_to_client(client_id, pickle.dumps(response))
-
-    def send_to_client(self, client_id, message):
-        reply_channel = self.connection.channel()
-        reply_queue_name = f'reply_{client_id}'
-        reply_channel.queue_declare(reply_queue_name, durable=False)
-
-        src.Log.print_with_color(f"[>>>] Sent notification to client {client_id}", "red")
-        reply_channel.basic_publish(
-            exchange='',
-            routing_key=reply_queue_name,
-            body=message
-        )
-
-    def notify_to_all_clients(self, message):
-        for (client_id, layer_id) in self.list_clients:
-            src.Log.print_with_color(f"[>>>] Sent resume training request to client {client_id}", "red")
-            self.send_to_client(client_id, pickle.dumps(message))
+                    self.notification_service.send_to_client(client_id, response)
 
     def random_dataset(self, num_clients):
         dataset_path = "./datasets/mnist_yolo_cls_dirichlet"
