@@ -743,7 +743,7 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                 return data
             else:
                 # print("No data received yet, waiting...")
-                time.sleep(1)
+                time.sleep(0.5)
 
     def send_gradient(self, data_id, gradients):
         # queue_name = f'gradient_queue_{self.layer_id - 1}'
@@ -848,7 +848,7 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
                 else:
                     self.backward_flag = False
 
-                time.sleep(1)
+                time.sleep(0.5)
         except pika.exceptions.ChannelClosedByBroker:
             print(f"Queue '{queue_name}' không tồn tại trên RabbitMQ server.")
         except Exception as e:
@@ -894,10 +894,10 @@ class Split_Learning_DetectionTrainer(DetectionTrainer):
 
                 except (pickle.UnpicklingError, ValueError) as e:
                     print(f"Error processing gradient queue data: {e}")
-                    time.sleep(1)
+                    time.sleep(0.5)
             else:
                 # print("No gradient data received yet, waiting...")
-                time.sleep(1)
+                time.sleep(0.5)
 
 
     def get_tensor_send_id (self, cut_layer):
@@ -1810,7 +1810,7 @@ class Split_Learning_ClassificationTrainer(ClassificationTrainer):
                 return data
             else:
                 # print("No data received yet, waiting...")
-                time.sleep(1)
+                time.sleep(0.5)
 
     def send_gradient(self, data_id, gradients):
         # queue_name = f'gradient_queue_{self.layer_id - 1}'
@@ -1940,7 +1940,7 @@ class Split_Learning_ClassificationTrainer(ClassificationTrainer):
             except Exception as e:
                 print("Error in check_gradient thread:", e)
                 break
-            time.sleep(1)
+            time.sleep(0.5)
 
         thread_channel.close()
         thread_connection.close()
