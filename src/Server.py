@@ -163,8 +163,12 @@ class Server:
             print("Received all parameter clients")
             print("LAST MODEL LAYER 1:", self.last_model_layer_1)
             print("LAST MODEL LAYER 2:", self.last_model_layer_2)
-            if message.get("round") < self.num_round:
-                avg_model_path =self.val_function.average_yolo_models(self.last_model_layer_1, "./fedavg_model_layer_1.pt")
+            current_round = message.get("round")
+            if current_round < self.num_round:
+                if current_round == 1:
+                    avg_model_path =self.val_function.average_yolo_models(self.last_model_layer_1, "./fedavg_model_layer_1.pt")
+                else:
+                    avg_model_path =self.val_function.average_yolo_models_plus(self.last_model_layer_1, "./fedavg_model_layer_1.pt", 0.1, "./fedavg_model_layer_1.pt")
                 response_message = {"action": "CONTINUE",
                     "message": "Continue training!",
                     "model_path": avg_model_path}

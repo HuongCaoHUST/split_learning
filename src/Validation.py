@@ -292,4 +292,36 @@ class ModelValidator:
         model_new.model.load_state_dict(avg_sd)
 
         model_new.save(output_path)
+        print(f"New model: {output_path}")
+        return output_path
+    
+    def average_yolo_models_plus(self, last_model_layer_1, old_model_path, alpha, output_path):
+        num_models = len(last_model_layer_1)
+        models = []
+        sds = []
+
+        for i in range(num_models):
+            m = YOLO(last_model_layer_1[i])
+            models.append(m)
+            sds.append(m.model.state_dict())
+    
+        avg_sd = {}
+        for key in sds[0].keys():
+            avg_sd[key] = torch.zeros_like(sds[0][key])
+            for i in range(num_models):
+                avg_sd[key] += sds[i][key]
+            avg_sd[key] = avg_sd[key] / num_models
+
+        old_model = YOLO(old_model_path)
+        old_sd = old_model.model.state_dict()
+
+        new_sd = {}
+        for key in avg_sd.keys():
+            new_sd[key] = alpha * avg_sd[key] + (1 - alpha) * old_sd[key]
+
+        model_new = YOLO(last_model_layer_1[0])
+        model_new.model.load_state_dict(new_sd)
+
+        model_new.save(output_path)
+        print(f"New model plus: {output_path}")
         return output_path
